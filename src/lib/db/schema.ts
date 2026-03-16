@@ -23,6 +23,7 @@ export const taskStatusEnum = pgEnum("task_status", [
   "polling",
   "done",
   "failed",
+  "scheduled",
 ]);
 export const creditTxnTypeEnum = pgEnum("credit_txn_type", [
   "grant",    // admin 充值
@@ -88,8 +89,11 @@ export const tasks = pgTable("tasks", {
     count: number;
     platform: string;
     model: string;
+    imageUrls?: string[];
   }>(),
   errorMessage: text("error_message"),
+  /** When set, task is deferred to this time (定时托管) */
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 });
@@ -145,6 +149,15 @@ export const systemConfig = pgTable("system_config", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Announcements (公告) ───
+
+export const announcements = pgTable("announcements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  content: text("content").notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── Type exports ───
 
 export type User = typeof users.$inferSelect;
@@ -157,3 +170,4 @@ export type TaskItem = typeof taskItems.$inferSelect;
 export type CreditTxn = typeof creditTxns.$inferSelect;
 export type UserAsset = typeof userAssets.$inferSelect;
 export type SystemConfigRow = typeof systemConfig.$inferSelect;
+export type Announcement = typeof announcements.$inferSelect;

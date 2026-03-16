@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Coins, Settings2, ListTodo } from "lucide-react";
+import { Users, Coins, Settings2, ListTodo, Megaphone } from "lucide-react";
 
 const tabs = [
   { href: "/admin", label: "用户管理", icon: Users },
   { href: "/admin/credits", label: "积分管理", icon: Coins },
   { href: "/admin/models", label: "模型配置", icon: Settings2 },
   { href: "/admin/tasks", label: "任务监控", icon: ListTodo },
+  { href: "/admin/announcements", label: "公告管理", icon: Megaphone },
 ];
 
 export function AdminTabs() {

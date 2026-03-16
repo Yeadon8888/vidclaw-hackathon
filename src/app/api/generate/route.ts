@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const { user } = authResult;
 
   const body = (await req.json()) as GenerateRequest;
-  const { type, input, modification, params } = body;
+  const { type, input, modification, params, scheduled } = body;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -183,12 +183,70 @@ export async function POST(req: NextRequest) {
 
         send({ type: "script", data: scriptResult });
 
-        // ── Step 4: Sora task submission ──
+        // ── Step 4: Check if scheduled (deferred) mode ──
         const soraPrompt =
           scriptResult.full_sora_prompt +
           " The product shown in the reference image must appear clearly and prominently in the video.";
 
         const count = Math.min(Math.max(params.count, 1), 10);
+
+        if (scheduled) {
+          // Compute next 2:00 AM UTC+8
+          const now = new Date();
+          const utc8 = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+          const target = new Date(utc8);
+          target.setHours(2, 0, 0, 0);
+          if (target <= utc8) target.setDate(target.getDate() + 1);
+          const scheduledAt = new Date(target.getTime() - 8 * 60 * 60 * 1000); // back to UTC
+
+          const taskType = type === "theme" ? "theme" : type === "url" ? "url" : "remix";
+          const [task] = await db
+            .insert(tasks)
+            .values({
+              userId: user.id,
+              type: taskType as "theme" | "remix" | "url",
+              status: "scheduled",
+              modelId: modelRow?.id,
+              inputText: taskType === "remix" ? (modification || "视频二创") : input,
+              soraPrompt,
+              scriptJson: scriptResult,
+              creditsCost: totalCost,
+              scheduledAt,
+              paramsJson: {
+                orientation: params.orientation,
+                duration: params.duration,
+                count,
+                platform: params.platform ?? "douyin",
+                model: modelSlug,
+                imageUrls: imageUrls.slice(0, 1),
+              },
+            })
+            .returning();
+
+          // Deduct credits
+          await db
+            .update(users)
+            .set({ credits: sql`${users.credits} - ${totalCost}` })
+            .where(eq(users.id, user.id));
+
+          await db.insert(creditTxns).values({
+            userId: user.id,
+            type: "consume",
+            amount: -totalCost,
+            reason: `定时生成 (${modelSlug} × ${count})`,
+            modelId: modelRow?.id,
+            taskId: task.id,
+            balanceAfter: user.credits - totalCost,
+          });
+
+          log(`任务已加入定时托管，将在凌晨 2:00 执行`);
+          send({ type: "stage", stage: "DONE" });
+          send({ type: "done" });
+          controller.close();
+          return;
+        }
+
+        // ── Step 4b: Immediate Sora task submission ──
         const videoParams: VideoParams = {
           prompt: soraPrompt,
           imageUrls: imageUrls.slice(0, 1),

@@ -54,6 +54,8 @@ export interface GenerateRequest {
   type: "theme" | "video_key" | "url";
   input: string;
   modification?: string;
+  /** When true, task is saved as "scheduled" for later execution */
+  scheduled?: boolean;
   params: {
     orientation: "portrait" | "landscape";
     duration: 10 | 15;

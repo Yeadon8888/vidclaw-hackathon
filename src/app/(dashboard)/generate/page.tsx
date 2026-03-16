@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Send, Upload, X, Film, Zap } from "lucide-react";
+import { Send, Upload, X, Film, Zap, CalendarClock } from "lucide-react";
 import { useGenerateStore, type PollResult } from "@/stores/generate";
 import { ParamBar } from "@/components/generate/ParamBar";
 import { ProcessLog } from "@/components/generate/ProcessLog";
@@ -25,6 +25,7 @@ const VIDEO_URL_PATTERN =
 export default function GeneratePage() {
   const [input, setInput] = useState("");
   const [pendingVideo, setPendingVideo] = useState<{ url: string; name: string; sizeMB: string } | null>(null);
+  const [scheduled, setScheduled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef(false);
 
@@ -54,7 +55,7 @@ export default function GeneratePage() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, params }),
+        body: JSON.stringify({ ...body, params, scheduled }),
       });
 
       if (!res.ok) {
@@ -336,14 +337,30 @@ export default function GeneratePage() {
           <div className="flex flex-wrap items-center gap-2">
             <ParamBar />
           </div>
-          <button
-            onClick={handleSend}
-            disabled={(!input.trim() && !pendingVideo) || isLoading}
-            className="vc-glow-btn flex items-center gap-2 px-8 py-3 text-sm"
-          >
-            <Zap className="h-4 w-4" />
-            生成
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Scheduled toggle */}
+            <button
+              onClick={() => setScheduled((p) => !p)}
+              disabled={isLoading}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all ${
+                scheduled
+                  ? "border-purple-500/40 bg-purple-500/10 text-purple-300"
+                  : "border-[var(--vc-border)] text-[var(--vc-text-muted)] hover:border-purple-500/30 hover:text-purple-300"
+              }`}
+              title="开启后任务将在凌晨 2:00 自动执行（成功率更高）"
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              定时托管
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={(!input.trim() && !pendingVideo) || isLoading}
+              className="vc-glow-btn flex items-center gap-2 px-8 py-3 text-sm"
+            >
+              <Zap className="h-4 w-4" />
+              {scheduled ? "定时生成" : "生成"}
+            </button>
+          </div>
         </div>
       </div>
 
