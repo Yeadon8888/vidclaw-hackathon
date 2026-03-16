@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
             type: taskType as "theme" | "remix" | "url",
             status: "generating",
             modelId: modelRow?.id,
-            inputText: input,
+            inputText: taskType === "remix" ? (modification || "视频二创") : input,
             soraPrompt,
             scriptJson: scriptResult,
             creditsCost: totalCost,

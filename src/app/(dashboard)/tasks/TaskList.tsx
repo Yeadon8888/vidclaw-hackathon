@@ -59,7 +59,7 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
 
             {task.inputText && (
               <p className="mt-2 truncate text-sm text-[var(--vc-text-secondary)]">
-                {task.type === "remix" ? "视频二创" : task.inputText}
+                {task.inputText}
               </p>
             )}
 
