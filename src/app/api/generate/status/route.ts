@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { queryTaskStatus, type ApiOverrides } from "@/lib/video/plato";
 import { db } from "@/lib/db";
-import { tasks, taskItems, models } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { tasks, taskItems, models, users, creditTxns } from "@/lib/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 /**
  * GET /api/generate/status?taskIds=id1,id2
@@ -103,8 +103,39 @@ export async function GET(req: NextRequest) {
           status: hasAnySuccess ? "done" : "failed",
           resultUrls: successUrls,
           completedAt: new Date(),
+          ...(!hasAnySuccess ? { errorMessage: "视频生成失败，积分已自动退还" } : {}),
         })
         .where(eq(tasks.id, firstItem.taskId));
+
+      // Auto-refund if all tasks failed
+      if (!hasAnySuccess) {
+        const [parentTask] = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, firstItem.taskId))
+          .limit(1);
+        if (parentTask && parentTask.creditsCost > 0) {
+          await db
+            .update(users)
+            .set({ credits: sql`${users.credits} + ${parentTask.creditsCost}` })
+            .where(eq(users.id, parentTask.userId));
+
+          const [u] = await db
+            .select({ credits: users.credits })
+            .from(users)
+            .where(eq(users.id, parentTask.userId))
+            .limit(1);
+
+          await db.insert(creditTxns).values({
+            userId: parentTask.userId,
+            type: "refund",
+            amount: parentTask.creditsCost,
+            reason: `生成失败自动退款`,
+            taskId: parentTask.id,
+            balanceAfter: u?.credits ?? 0,
+          });
+        }
+      }
     }
   }
 
