@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Send, Upload } from "lucide-react";
+import { Send, Upload, X, Film } from "lucide-react";
 import { useGenerateStore, type PollResult } from "@/stores/generate";
 import { ParamBar } from "@/components/generate/ParamBar";
 import { ProcessLog } from "@/components/generate/ProcessLog";
@@ -24,6 +24,7 @@ const VIDEO_URL_PATTERN =
 
 export default function GeneratePage() {
   const [input, setInput] = useState("");
+  const [pendingVideo, setPendingVideo] = useState<{ url: string; name: string; sizeMB: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef(false);
 
@@ -202,7 +203,23 @@ export default function GeneratePage() {
 
   function handleSend() {
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (isLoading) return;
+
+    // Video remix mode: pending video uploaded
+    if (pendingVideo) {
+      const modification = text || undefined;
+      setInput("");
+      const videoUrl = pendingVideo.url;
+      setPendingVideo(null);
+      startGenerate({
+        type: "video_key",
+        input: videoUrl,
+        modification,
+      });
+      return;
+    }
+
+    if (!text) return;
     setInput("");
 
     const isUrl = VIDEO_URL_PATTERN.test(text);
@@ -217,9 +234,7 @@ export default function GeneratePage() {
     if (!file) return;
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    const modification = input.trim() || undefined;
-    setInput("");
-
+    // Upload the video first, then wait for user to confirm
     reset();
     setStage("DOWNLOAD");
     addLog("正在上传视频...");
@@ -239,13 +254,12 @@ export default function GeneratePage() {
       }
 
       const asset = await uploadRes.json();
-      addLog(`视频已上传 (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+      addLog(`视频已上传 (${sizeMB} MB)，请调整参数后点击发送`);
 
-      await startGenerate({
-        type: "video_key",
-        input: asset.url,
-        modification,
-      });
+      // Store pending video — don't start generation yet
+      setPendingVideo({ url: asset.url, name: file.name, sizeMB });
+      setStage("IDLE");
     } catch (err) {
       setError("UPLOAD_FAILED", String(err));
     }
@@ -290,19 +304,35 @@ export default function GeneratePage() {
             onChange={handleVideoFile}
           />
 
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="粘贴抖音/TikTok 链接，或输入创意主题..."
-            rows={2}
-            disabled={isLoading}
-            className="max-h-32 flex-1 resize-none bg-transparent py-2 text-sm leading-relaxed text-white placeholder-[var(--vc-text-dim)] outline-none"
-          />
+          <div className="flex-1">
+            {pendingVideo && (
+              <div className="mb-1.5 flex items-center gap-2 rounded-[var(--vc-radius-sm)] bg-purple-500/10 px-2.5 py-1.5">
+                <Film className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+                <span className="truncate text-xs text-purple-300">
+                  {pendingVideo.name} ({pendingVideo.sizeMB} MB)
+                </span>
+                <button
+                  onClick={() => setPendingVideo(null)}
+                  className="ml-auto shrink-0 rounded p-0.5 text-purple-400/60 transition-colors hover:bg-purple-500/20 hover:text-purple-300"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={pendingVideo ? "输入修改提示（可选），然后点击发送..." : "粘贴抖音/TikTok 链接，或输入创意主题..."}
+              rows={2}
+              disabled={isLoading}
+              className="max-h-32 w-full resize-none bg-transparent py-2 text-sm leading-relaxed text-white placeholder-[var(--vc-text-dim)] outline-none"
+            />
+          </div>
 
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && !pendingVideo) || isLoading}
             className="vc-gradient-btn shrink-0 rounded-[var(--vc-radius-md)] px-4 py-2 text-sm font-medium"
           >
             <Send className="h-4 w-4" />
