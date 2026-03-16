@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────
+   STYLE DNA — VidClaw Design System
+   ───────────────────────────────────── */
+
+:root {
+  /* ── Surface layers ── */
+  --vc-bg-root: #09090b;
+  --vc-bg-surface: #18181b;
+  --vc-bg-elevated: #27272a;
+  --vc-bg-overlay: rgba(9, 9, 11, 0.80);
+
+  /* ── Accent: purple → blue gradient ── */
+  --vc-accent: #a855f7;
+  --vc-accent-hover: #9333ea;
+  --vc-accent-subtle: rgba(168, 85, 247, 0.10);
+  --vc-gradient: linear-gradient(135deg, #a855f7, #3b82f6);
+  --vc-gradient-hover: linear-gradient(135deg, #9333ea, #2563eb);
+
+  /* ── Text ── */
+  --vc-text: #fafafa;
+  --vc-text-secondary: #a1a1aa;
+  --vc-text-muted: #71717a;
+  --vc-text-dim: #52525b;
+
+  /* ── Border ── */
+  --vc-border: #27272a;
+  --vc-border-subtle: #1e1e22;
+
+  /* ── Semantic ── */
+  --vc-success: #34d399;
+  --vc-error: #f87171;
+  --vc-warning: #fbbf24;
+  --vc-info: #60a5fa;
+
+  /* ── Radius ── */
+  --vc-radius-sm: 6px;
+  --vc-radius-md: 8px;
+  --vc-radius-lg: 12px;
+  --vc-radius-xl: 16px;
+
+  /* ── Shadows ── */
+  --vc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --vc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --vc-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --vc-shadow-glow: 0 0 20px rgba(168, 85, 247, 0.15);
+
+  /* ── Timing ── */
+  --vc-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --vc-duration-fast: 150ms;
+  --vc-duration-base: 200ms;
+  --vc-duration-slow: 300ms;
+}
+
+@theme inline {
+  --color-background: var(--vc-bg-root);
+  --color-foreground: var(--vc-text);
+  --font-sans: "Inter", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+}
+
+/* ─────── Base ─────── */
+
+body {
+  background: var(--vc-bg-root);
+  color: var(--vc-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─────── Custom scrollbar ─────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* ─────── Selection ─────── */
+
+::selection {
+  background: rgba(168, 85, 247, 0.30);
+  color: #fafafa;
+}
+
+/* ─────── Focus ring ─────── */
+
+:focus-visible {
+  outline: 2px solid var(--vc-accent);
+  outline-offset: 2px;
+}
+
+/* ─────── Animations ─────── */
+
+@keyframes vc-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes vc-slide-in-left {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes vc-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+  50% { box-shadow: 0 0 16px 4px rgba(168, 85, 247, 0.15); }
+}
+@keyframes vc-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes vc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ─────── Utility classes ─────── */
+
+.vc-card {
+  background: var(--vc-bg-surface);
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius-lg);
+  box-shadow: var(--vc-shadow-sm);
+}
+.vc-glass {
+  background: rgba(24, 24, 27, 0.60);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border: 1px solid rgba(63, 63, 70, 0.40);
+}
+.vc-gradient-text {
+  background: var(--vc-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.vc-gradient-btn {
+  background: var(--vc-gradient);
+  color: white;
+  border: none;
+  transition: all var(--vc-duration-fast) var(--vc-ease);
+}
+.vc-gradient-btn:hover {
+  background: var(--vc-gradient-hover);
+  box-shadow: var(--vc-shadow-glow);
+}
+.vc-gradient-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.vc-animate-in {
+  animation: vc-fade-in var(--vc-duration-slow) var(--vc-ease) both;
+}
+.vc-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(168, 85, 247, 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: vc-shimmer 2s ease-in-out infinite;
+}
+
+/* ─────── Landing page tokens ─────── */
+
+.font-heading { font-family: var(--font-jakarta), var(--font-inter), system-ui, sans-serif; }
+.font-mono-data { font-family: var(--font-jetbrains), ui-monospace, monospace; }
