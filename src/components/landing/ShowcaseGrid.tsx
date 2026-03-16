@@ -4,12 +4,15 @@ import { motion, useInView } from "framer-motion";
 import { useRef, useCallback } from "react";
 import Image from "next/image";
 
+const R2_BASE = "https://vc-upload.yeadon.top/files/vidclaw-assets/showcase";
+
 const showcaseItems = [
   {
     title: "护肤精华液",
     desc: "质地流动 · 特写广告",
     cat: "美妆个护",
     img: "/showcase/skincare.jpg",
+    video: `${R2_BASE}/skincare.mp4`,
     gradient: "from-[#8B1A4A] to-[#4A0D28]",
   },
   {
@@ -17,6 +20,7 @@ const showcaseItems = [
     desc: "沉浸开箱体验",
     cat: "3C 数码",
     img: "/showcase/headphones.jpg",
+    video: `${R2_BASE}/headphones.mp4`,
     gradient: "from-[#0D3A6B] to-[#061E3A]",
   },
   {
@@ -24,6 +28,7 @@ const showcaseItems = [
     desc: "街拍穿搭展示",
     cat: "服饰鞋包",
     img: "/showcase/sneakers.jpg",
+    video: `${R2_BASE}/sneakers.mp4`,
     gradient: "from-[#5C3A00] to-[#2E1D00]",
   },
   {
@@ -31,6 +36,7 @@ const showcaseItems = [
     desc: "制作过程特写",
     cat: "食品饮料",
     img: "/showcase/coffee.jpg",
+    video: `${R2_BASE}/coffee.mp4`,
     gradient: "from-[#5C2800] to-[#2E1200]",
   },
   {
@@ -102,13 +108,25 @@ export function ShowcaseGrid() {
           >
             {/* 9:16 card */}
             <div className="relative aspect-[9/16] overflow-hidden">
-              <Image
-                src={item.img}
-                alt={item.title}
-                fill
-                className="object-cover"
-                sizes="200px"
-              />
+              {item.video ? (
+                <video
+                  src={item.video}
+                  poster={item.img}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <Image
+                  src={item.img}
+                  alt={item.title}
+                  fill
+                  className="object-cover"
+                  sizes="200px"
+                />
+              )}
               {/* Gradient overlay */}
               <div className={`absolute inset-0 bg-gradient-to-t ${item.gradient} opacity-40`} />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
@@ -146,13 +164,25 @@ export function ShowcaseGrid() {
             className="group relative overflow-hidden rounded-xl"
           >
             <div className="relative aspect-[9/16] overflow-hidden">
-              <Image
-                src={item.img}
-                alt={item.title}
-                fill
-                className="object-cover"
-                sizes="50vw"
-              />
+              {item.video ? (
+                <video
+                  src={item.video}
+                  poster={item.img}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <Image
+                  src={item.img}
+                  alt={item.title}
+                  fill
+                  className="object-cover"
+                  sizes="50vw"
+                />
+              )}
               <div className={`absolute inset-0 bg-gradient-to-t ${item.gradient} opacity-40`} />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
               <span className="absolute left-2 top-2 rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] text-white/80">
