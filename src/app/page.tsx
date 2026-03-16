@@ -64,8 +64,15 @@ export default async function LandingPage() {
       </header>
 
       {/* ═══════════════════ Hero ═══════════════════ */}
-      <section className="px-6 pb-20 pt-20 lg:px-12 lg:pt-32">
-        <div className="mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-16 lg:grid-cols-2">
+      <section className="relative overflow-hidden px-6 pb-20 pt-20 lg:px-12 lg:pt-32">
+        {/* Animated orbs */}
+        <div className="vc-orb absolute -left-32 -top-32 h-[500px] w-[500px] bg-[var(--vc-accent)]/20" />
+        <div className="vc-orb absolute -right-48 top-20 h-[400px] w-[400px] bg-cyan-500/10" style={{ animationDelay: '2s' }} />
+        <div className="vc-orb absolute bottom-0 left-1/3 h-[300px] w-[300px] bg-teal-500/10" style={{ animationDelay: '4s' }} />
+        {/* Grid overlay */}
+        <div className="vc-grid-overlay pointer-events-none absolute inset-0" />
+
+        <div className="relative mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-16 lg:grid-cols-2">
           {/* Left — Text */}
           <div>
             <ScrollReveal>
@@ -112,7 +119,7 @@ export default async function LandingPage() {
 
           {/* Right — Search-style input preview */}
           <ScrollReveal delay={0.3}>
-            <div className="rounded-xl border border-white/5 bg-[var(--vc-bg-surface)] p-2 shadow-2xl">
+            <div className="rounded-xl border border-[var(--vc-accent)]/15 bg-[var(--vc-bg-surface)]/80 p-2 shadow-2xl shadow-[var(--vc-accent)]/5 backdrop-blur-sm">
               <div className="flex items-start gap-4 rounded-lg p-4">
                 <Zap className="mt-1 h-7 w-7 shrink-0 text-[var(--vc-accent)]" />
                 <div className="flex-1">
@@ -139,9 +146,9 @@ export default async function LandingPage() {
       </section>
 
       {/* ═══════════════════ 数据带 ═══════════════════ */}
-      <section className="px-6 pb-20 lg:px-12">
+      <section className="relative px-6 pb-20 lg:px-12">
         <ScrollReveal>
-          <div className="mx-auto flex max-w-[1280px] flex-wrap justify-between gap-12 rounded-2xl border border-[var(--vc-accent)]/10 bg-[var(--vc-bg-surface)]/50 p-8 backdrop-blur-sm lg:p-12">
+          <div className="mx-auto flex max-w-[1280px] flex-wrap justify-between gap-12 rounded-2xl border border-[var(--vc-accent)]/10 bg-gradient-to-r from-[var(--vc-bg-surface)]/60 to-[var(--vc-accent)]/5 p-8 shadow-lg shadow-[var(--vc-accent)]/5 backdrop-blur-sm lg:p-12">
             {[
               { label: "视频已生成", value: 120000, suffix: "+" },
               { label: "平均生成时间", value: 2.8, suffix: "min", isRaw: true },
@@ -202,8 +209,9 @@ export default async function LandingPage() {
       </section>
 
       {/* ═══════════════════ CTA ═══════════════════ */}
-      <section className="border-t border-[var(--vc-border)] px-6 py-24 lg:px-12">
-        <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-8 text-center lg:flex-row lg:text-left">
+      <section className="relative overflow-hidden border-t border-[var(--vc-border)] px-6 py-24 lg:px-12">
+        <div className="vc-orb absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 bg-[var(--vc-accent)]/8" />
+        <div className="relative mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-8 text-center lg:flex-row lg:text-left">
           <ScrollReveal>
             <h2 className="font-heading text-3xl font-bold leading-tight lg:text-5xl">
               今天开始，<span className="vc-gradient-text">明天就有内容</span>

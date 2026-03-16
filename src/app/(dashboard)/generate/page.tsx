@@ -279,7 +279,7 @@ export default function GeneratePage() {
       <div className="pt-4 text-center sm:pt-8 space-y-4">
         <h1 className="text-4xl font-black tracking-tight md:text-6xl">
           <span className="bg-gradient-to-r from-white via-slate-200 to-[var(--vc-accent)] bg-clip-text text-transparent">
-            AI 视频生成
+            AI 驱动的带货短视频
           </span>
         </h1>
         <p className="text-lg text-slate-400">粘贴链接、上传视频或描述主题，AI 一键出片</p>

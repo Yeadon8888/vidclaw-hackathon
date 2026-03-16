@@ -176,10 +176,33 @@ body {
 /* ─────── Mesh gradient backgrounds ─────── */
 
 .vc-mesh-gradient {
-  background-color: #101f22;
+  background-color: #0a1214;
   background-image:
-    radial-gradient(at 0% 0%, rgba(13, 204, 242, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(13, 204, 242, 0.1) 0px, transparent 50%);
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(13, 204, 242, 0.18) 0px, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 10%, rgba(13, 150, 242, 0.12) 0px, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(13, 204, 242, 0.08) 0px, transparent 50%);
+}
+
+/* Animated floating orbs for hero */
+@keyframes float-orb {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.95); }
+}
+.vc-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: float-orb 8s ease-in-out infinite;
+}
+
+/* Grid overlay for hero */
+.vc-grid-overlay {
+  background-image:
+    linear-gradient(rgba(13, 204, 242, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13, 204, 242, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
 }
 
 .vc-gradient-border {
