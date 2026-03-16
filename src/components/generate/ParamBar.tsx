@@ -17,7 +17,7 @@ const FALLBACK_MODELS: ModelOption[] = [
 ];
 
 const selectClass =
-  "rounded-[var(--vc-radius-md)] bg-[var(--vc-bg-root)] border border-[var(--vc-border)] px-2.5 py-1.5 text-xs text-white outline-none cursor-pointer transition-colors duration-150 hover:border-zinc-600 focus:border-purple-500 sm:text-sm sm:px-3";
+  "rounded-[var(--vc-radius-md)] bg-[var(--vc-bg-root)] border border-[var(--vc-border)] px-2.5 py-1.5 text-xs text-white outline-none cursor-pointer transition-colors duration-150 hover:border-zinc-600 focus:border-[var(--vc-accent)] sm:text-sm sm:px-3";
 
 export function ParamBar() {
   const params = useGenerateStore((s) => s.params);
@@ -97,7 +97,7 @@ export function ParamBar() {
         ))}
       </select>
 
-      <span className="text-xs tabular-nums text-purple-400">
+      <span className="text-xs tabular-nums text-[var(--vc-accent)]">
         消耗 {totalCredits} 积分
       </span>
     </div>

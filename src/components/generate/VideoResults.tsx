@@ -16,7 +16,7 @@ export function VideoResults() {
     return (
       <div className="vc-card vc-animate-in p-4">
         <h3 className="mb-3 text-sm font-semibold text-zinc-300">
-          生成进度 {!allDone && <span className="animate-pulse text-purple-400">●</span>}
+          生成进度 {!allDone && <span className="animate-pulse text-[var(--vc-accent)]">●</span>}
         </h3>
         <div className="space-y-2">
           {pollResults.map((r) => (

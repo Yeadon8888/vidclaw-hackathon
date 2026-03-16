@@ -114,12 +114,12 @@ export function PromptEditor({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               </p>
               {SECTIONS.map((section) => (
                 <div key={section.key}>
-                  <label className="mb-1 block text-sm font-medium text-purple-300">
+                  <label className="mb-1 block text-sm font-medium text-[var(--vc-accent)]">
                     {section.label}
                   </label>
                   <p className="mb-2 text-xs text-[var(--vc-text-dim)]">{section.description}</p>
                   <textarea
-                    className="w-full resize-y rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-zinc-200 focus:border-purple-500 focus:outline-none"
+                    className="w-full resize-y rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-zinc-200 focus:border-[var(--vc-accent)] focus:outline-none"
                     rows={6}
                     value={prompts[section.key] ?? ""}
                     onChange={(e) => handleChange(section.key, e.target.value)}
@@ -143,7 +143,7 @@ export function PromptEditor({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-[var(--vc-radius-md)] bg-purple-600 px-5 py-2 text-sm transition hover:bg-purple-500 disabled:opacity-50"
+            className="vc-gradient-btn rounded-[var(--vc-radius-md)] px-5 py-2 text-sm disabled:opacity-50"
           >
             {saving ? "保存中..." : "保存"}
           </button>

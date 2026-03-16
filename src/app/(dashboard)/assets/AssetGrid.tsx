@@ -57,7 +57,7 @@ export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className="flex w-full items-center justify-center gap-2 rounded-[var(--vc-radius-lg)] border-2 border-dashed border-[var(--vc-border)] bg-transparent py-6 text-sm text-[var(--vc-text-muted)] transition-all duration-200 hover:border-purple-500/40 hover:text-purple-400 disabled:opacity-50 sm:py-8"
+        className="flex w-full items-center justify-center gap-2 rounded-[var(--vc-radius-lg)] border-2 border-dashed border-[var(--vc-border)] bg-transparent py-6 text-sm text-[var(--vc-text-muted)] transition-all duration-200 hover:border-[var(--vc-accent)]/40 hover:text-[var(--vc-accent)] disabled:opacity-50 sm:py-8"
       >
         <Upload className="h-5 w-5" />
         {uploading ? "上传中..." : "点击上传参考图片（支持多选）"}

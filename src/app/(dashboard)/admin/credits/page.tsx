@@ -43,7 +43,7 @@ export default function AdminCreditsPage() {
           placeholder="输入用户 ID 查询积分流水..."
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
-          className="w-96 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white placeholder-zinc-500 transition-colors focus:border-purple-500 focus:outline-none"
+          className="w-96 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white placeholder-zinc-500 transition-colors focus:border-[var(--vc-accent)] focus:outline-none"
         />
         <button
           onClick={fetchTxns}

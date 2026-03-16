@@ -285,7 +285,7 @@ export default function GeneratePage() {
       </div>
 
       {/* ═══ Main Input Card ═══ */}
-      <div className="vc-card overflow-hidden border-purple-500/20 p-4 shadow-[0_0_24px_rgba(168,85,247,0.06)] sm:p-5">
+      <div className="vc-card overflow-hidden border-[var(--vc-accent)]/20 p-4 shadow-[var(--vc-shadow-glow)] sm:p-5">
         {/* Textarea */}
         <div className="flex items-end gap-2">
           <button
@@ -306,14 +306,14 @@ export default function GeneratePage() {
 
           <div className="flex-1">
             {pendingVideo && (
-              <div className="mb-1.5 flex items-center gap-2 rounded-[var(--vc-radius-sm)] bg-purple-500/10 px-2.5 py-1.5">
-                <Film className="h-3.5 w-3.5 shrink-0 text-purple-400" />
-                <span className="truncate text-xs text-purple-300">
+              <div className="mb-1.5 flex items-center gap-2 rounded-[var(--vc-radius-sm)] bg-[var(--vc-accent)]/10 px-2.5 py-1.5">
+                <Film className="h-3.5 w-3.5 shrink-0 text-[var(--vc-accent)]" />
+                <span className="truncate text-xs text-[var(--vc-accent)]">
                   {pendingVideo.name} ({pendingVideo.sizeMB} MB)
                 </span>
                 <button
                   onClick={() => setPendingVideo(null)}
-                  className="ml-auto shrink-0 rounded p-0.5 text-purple-400/60 transition-colors hover:bg-purple-500/20 hover:text-purple-300"
+                  className="ml-auto shrink-0 rounded p-0.5 text-[var(--vc-accent)]/60 transition-colors hover:bg-[var(--vc-accent)]/20 hover:text-[var(--vc-accent)]"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -357,7 +357,7 @@ export default function GeneratePage() {
             ].map(({ title, desc }) => (
               <button
                 key={title}
-                className="vc-card group flex items-center gap-3 p-3 text-left transition-all duration-200 hover:border-purple-500/30 hover:shadow-[var(--vc-shadow-md)] sm:flex-col sm:items-start sm:gap-1"
+                className="vc-card group flex items-center gap-3 p-3 text-left transition-all duration-200 hover:border-[var(--vc-accent)]/30 hover:shadow-[var(--vc-shadow-md)] sm:flex-col sm:items-start sm:gap-1"
                 onClick={() => {
                   if (title.includes("上传")) {
                     fileInputRef.current?.click();

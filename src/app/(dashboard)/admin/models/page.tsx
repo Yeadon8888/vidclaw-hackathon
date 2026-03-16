@@ -225,7 +225,7 @@ export default function AdminModelsPage() {
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--vc-accent)]"
                 />
               </div>
               <div>
@@ -235,7 +235,7 @@ export default function AdminModelsPage() {
                   min={0}
                   value={form.creditsPerGen}
                   onChange={(e) => setForm((f) => ({ ...f, creditsPerGen: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--vc-accent)]"
                 />
               </div>
               <div>
@@ -246,7 +246,7 @@ export default function AdminModelsPage() {
                   value={form.baseUrl}
                   onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
                   placeholder="https://api.bltcy.ai"
-                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-purple-500 placeholder-zinc-600"
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--vc-accent)] placeholder-zinc-600"
                 />
               </div>
               <div>
@@ -258,7 +258,7 @@ export default function AdminModelsPage() {
                   value={form.apiKey}
                   onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
                   placeholder="sk-..."
-                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-purple-500 placeholder-zinc-600"
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--vc-accent)] placeholder-zinc-600"
                 />
               </div>
             </div>

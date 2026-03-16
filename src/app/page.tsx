@@ -17,9 +17,9 @@ export default async function LandingPage() {
   const ctaLabel = user ? "进入工作台" : "免费开始创作";
 
   return (
-    <div className="min-h-screen bg-[#0D0F14] text-white">
+    <div className="min-h-screen bg-[var(--vc-bg-root)] text-white">
       {/* ═══════════════════ 导航栏 ═══════════════════ */}
-      <header className="sticky top-0 z-50 border-b border-[#1A1D26] bg-[#12151C]/90 backdrop-blur-lg">
+      <header className="sticky top-0 z-50 border-b border-[var(--vc-border)] bg-[var(--vc-bg-surface)]/90 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-xl">⚡</span>
@@ -28,7 +28,7 @@ export default async function LandingPage() {
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm text-[#8B8FA8] md:flex">
+          <nav className="hidden items-center gap-8 text-sm text-[var(--vc-text-secondary)] md:flex">
             <a href="#features" className="transition-colors duration-200 hover:text-white">功能特性</a>
             <a href="#showcase" className="transition-colors duration-200 hover:text-white">案例展示</a>
           </nav>
@@ -37,7 +37,7 @@ export default async function LandingPage() {
             {user ? (
               <Link
                 href="/generate"
-                className="inline-flex items-center gap-2 rounded-lg bg-[#4F8EFF] px-5 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#3A7AFF]"
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--vc-accent)] px-5 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--vc-accent-hover)]"
               >
                 工作台
                 <ArrowRight className="h-4 w-4" />
@@ -46,13 +46,13 @@ export default async function LandingPage() {
               <>
                 <Link
                   href="/login"
-                  className="hidden rounded-lg px-4 py-2 text-sm text-[#8B8FA8] transition-colors duration-200 hover:text-white sm:inline-flex"
+                  className="hidden rounded-lg px-4 py-2 text-sm text-[var(--vc-text-secondary)] transition-colors duration-200 hover:text-white sm:inline-flex"
                 >
                   登录
                 </Link>
                 <Link
                   href="/register"
-                  className="inline-flex items-center rounded-lg bg-[#4F8EFF] px-5 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#3A7AFF]"
+                  className="inline-flex items-center rounded-lg bg-[var(--vc-accent)] px-5 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--vc-accent-hover)]"
                 >
                   免费开始
                 </Link>
@@ -68,7 +68,7 @@ export default async function LandingPage() {
           {/* Left 45% — Text */}
           <div className="w-full lg:w-[45%]">
             <ScrollReveal>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#4F8EFF]/30 bg-[#1A1D26] px-3.5 py-1.5 text-xs font-medium text-[#4F8EFF]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[var(--vc-accent)]/30 bg-[var(--vc-bg-surface)] px-3.5 py-1.5 text-xs font-medium text-[var(--vc-accent)]">
                 <Zap className="h-3.5 w-3.5" />
                 VEO 3.1 & Sora 双引擎
               </span>
@@ -78,7 +78,7 @@ export default async function LandingPage() {
               <h1 className="mt-6 font-heading text-[48px] font-bold leading-[1.1] tracking-tight">
                 AI 驱动的
                 <br />
-                <span className="bg-gradient-to-r from-[#4F8EFF] to-[#8B2FFF] bg-clip-text text-transparent">
+                <span className="vc-gradient-text">
                   带货短视频
                 </span>
                 生成器
@@ -86,7 +86,7 @@ export default async function LandingPage() {
             </ScrollReveal>
 
             <ScrollReveal delay={0.16}>
-              <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[#8B8FA8]">
+              <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[var(--vc-text-secondary)]">
                 粘贴链接、上传视频或描述主题，3分钟自动生成
               </p>
             </ScrollReveal>
@@ -95,7 +95,7 @@ export default async function LandingPage() {
               <div className="mt-8">
                 <Link
                   href={ctaHref}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#4F8EFF] px-7 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#3A7AFF] hover:shadow-lg hover:shadow-[#4F8EFF]/20"
+                  className="vc-gradient-btn inline-flex items-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold transition-all duration-200"
                 >
                   {ctaLabel}
                   <ArrowRight className="h-4 w-4" />
@@ -113,20 +113,20 @@ export default async function LandingPage() {
 
       {/* ═══════════════════ 数据带 ═══════════════════ */}
       <section className="px-6 pb-16">
-        <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 rounded-xl bg-[#1A1D26] px-8 py-5 sm:flex-row">
+        <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 rounded-xl bg-[var(--vc-bg-surface)] border border-[var(--vc-border)] px-8 py-5 sm:flex-row">
           <div className="flex items-center gap-2 text-sm">
             <AnimatedCounter target={120000} suffix="+" />
-            <span className="text-[#8B8FA8]">视频已生成</span>
+            <span className="text-[var(--vc-text-secondary)]">视频已生成</span>
           </div>
-          <div className="hidden h-4 w-px bg-[#22263A] sm:block" />
+          <div className="hidden h-4 w-px bg-[var(--vc-border)] sm:block" />
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-[#8B8FA8]">平均</span>
-            <span className="font-mono-data text-[#4F8EFF]">2.8</span>
-            <span className="text-[#8B8FA8]">分钟</span>
+            <span className="text-[var(--vc-text-secondary)]">平均</span>
+            <span className="font-mono-data text-[var(--vc-accent)]">2.8</span>
+            <span className="text-[var(--vc-text-secondary)]">分钟</span>
           </div>
-          <div className="hidden h-4 w-px bg-[#22263A] sm:block" />
+          <div className="hidden h-4 w-px bg-[var(--vc-border)] sm:block" />
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-[#8B8FA8]">支持抖音/TikTok/小红书</span>
+            <span className="text-[var(--vc-text-secondary)]">支持抖音/TikTok/小红书</span>
           </div>
         </div>
       </section>
@@ -138,7 +138,7 @@ export default async function LandingPage() {
             <h2 className="font-heading text-[26px] font-bold">
               三种模式，覆盖所有创作场景
             </h2>
-            <p className="mt-2 text-[15px] text-[#8B8FA8]">
+            <p className="mt-2 text-[15px] text-[var(--vc-text-secondary)]">
               无论是二创热门视频还是从零生产内容
             </p>
           </ScrollReveal>
@@ -150,14 +150,14 @@ export default async function LandingPage() {
       </section>
 
       {/* ═══════════════════ 案例展示 ═══════════════════ */}
-      <section id="showcase" className="border-t border-[#1A1D26] px-6 py-24">
+      <section id="showcase" className="border-t border-[var(--vc-border)] px-6 py-24">
         <div className="mx-auto max-w-[1280px]">
           <ScrollReveal>
             <div className="text-center">
               <h2 className="font-heading text-[26px] font-bold">
                 AI 生成的产品广告
               </h2>
-              <p className="mt-2 text-[15px] text-[#8B8FA8]">
+              <p className="mt-2 text-[15px] text-[var(--vc-text-secondary)]">
                 不同品类、不同风格
               </p>
             </div>
@@ -170,7 +170,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ═══════════════════ CTA ═══════════════════ */}
-      <section className="border-t border-[#1A1D26] px-6 py-24">
+      <section className="border-t border-[var(--vc-border)] px-6 py-24">
         <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-8 text-center lg:flex-row lg:text-left">
           <ScrollReveal>
             <h2 className="font-heading text-3xl font-bold leading-tight lg:text-4xl">
@@ -181,7 +181,7 @@ export default async function LandingPage() {
           <ScrollReveal delay={0.1}>
             <Link
               href={ctaHref}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#4F8EFF] px-8 py-3.5 text-base font-semibold text-white transition-all duration-200 hover:bg-[#3A7AFF] hover:shadow-lg hover:shadow-[#4F8EFF]/20"
+              className="vc-gradient-btn inline-flex items-center gap-2 rounded-lg px-8 py-3.5 text-base font-semibold transition-all duration-200"
             >
               {ctaLabel}
               <ArrowRight className="h-5 w-5" />
@@ -191,13 +191,13 @@ export default async function LandingPage() {
       </section>
 
       {/* ═══════════════════ Footer ═══════════════════ */}
-      <footer className="border-t border-[#1A1D26] px-6 py-8">
+      <footer className="border-t border-[var(--vc-border)] px-6 py-8">
         <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
             <span className="text-base">⚡</span>
             <span className="font-heading text-sm font-bold">VidClaw</span>
           </div>
-          <p className="text-xs text-[#8B8FA8]">
+          <p className="text-xs text-[var(--vc-text-secondary)]">
             © {new Date().getFullYear()} VidClaw · AI 短视频生成平台
           </p>
         </div>

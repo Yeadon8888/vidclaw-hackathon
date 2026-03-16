@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
           placeholder="搜索邮箱或用户名..."
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white placeholder-zinc-500 transition-colors focus:border-purple-500 focus:outline-none sm:w-72"
+          className="w-full rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white placeholder-zinc-500 transition-colors focus:border-[var(--vc-accent)] focus:outline-none sm:w-72"
         />
         <span className="text-sm text-[var(--vc-text-muted)]">共 {total} 个用户</span>
       </div>
@@ -112,7 +112,7 @@ export default function AdminUsersPage() {
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs ${
                         u.role === "admin"
-                          ? "bg-purple-500/20 text-purple-400"
+                          ? "bg-[var(--vc-accent)]/20 text-[var(--vc-accent)]"
                           : "bg-zinc-700 text-zinc-300"
                       }`}
                     >

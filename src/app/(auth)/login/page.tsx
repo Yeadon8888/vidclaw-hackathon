@@ -47,7 +47,7 @@ function LoginForm() {
             name="email"
             type="email"
             required
-            className="mt-1 w-full rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-4 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition-colors duration-150 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
+            className="mt-1 w-full rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-4 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition-colors duration-150 focus:border-[var(--vc-accent)] focus:ring-1 focus:ring-[var(--vc-accent)]/50"
             placeholder="you@example.com"
           />
         </div>
@@ -62,7 +62,7 @@ function LoginForm() {
             type="password"
             required
             minLength={6}
-            className="mt-1 w-full rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-4 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition-colors duration-150 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
+            className="mt-1 w-full rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-4 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition-colors duration-150 focus:border-[var(--vc-accent)] focus:ring-1 focus:ring-[var(--vc-accent)]/50"
             placeholder="••••••••"
           />
         </div>
@@ -84,7 +84,7 @@ function LoginForm() {
 
       <p className="text-center text-sm text-[var(--vc-text-muted)]">
         还没有账号？{" "}
-        <Link href="/register" className="text-purple-400 transition-colors hover:text-purple-300">
+        <Link href="/register" className="text-[var(--vc-accent)] transition-colors hover:text-[var(--vc-accent-hover)]">
           注册
         </Link>
       </p>

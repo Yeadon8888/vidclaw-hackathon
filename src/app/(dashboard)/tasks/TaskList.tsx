@@ -6,7 +6,7 @@ import type { Task } from "@/lib/db/schema";
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   pending: { icon: Clock, color: "text-zinc-400", label: "等待中" },
   analyzing: { icon: Loader2, color: "text-blue-400", label: "分析中" },
-  generating: { icon: Loader2, color: "text-purple-400", label: "生成中" },
+  generating: { icon: Loader2, color: "text-[var(--vc-accent)]", label: "生成中" },
   polling: { icon: Loader2, color: "text-yellow-400", label: "等待回片" },
   done: { icon: CheckCircle, color: "text-green-400", label: "完成" },
   failed: { icon: XCircle, color: "text-red-400", label: "失败" },

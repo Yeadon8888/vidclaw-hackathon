@@ -18,19 +18,19 @@ export function HeroPreview() {
       className="relative w-full max-w-md"
     >
       {/* Shadow glow */}
-      <div className="absolute -inset-4 rounded-3xl bg-[#4F8EFF]/8 blur-2xl" />
+      <div className="absolute -inset-4 rounded-3xl bg-[var(--vc-accent)]/8 blur-2xl" />
 
       {/* Main card */}
-      <div className="relative overflow-hidden rounded-2xl border border-[#22263A] bg-[#12151C] shadow-2xl shadow-black/40">
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] shadow-2xl shadow-black/40">
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-[#1A1D26] px-4 pt-4 pb-3">
+        <div className="flex gap-1 border-b border-[var(--vc-border)] px-4 pt-4 pb-3">
           {tabs.map((tab, i) => (
             <span
               key={tab}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 i === 0
-                  ? "bg-[#4F8EFF]/15 text-[#4F8EFF]"
-                  : "text-[#8B8FA8] hover:text-white"
+                  ? "bg-[var(--vc-accent)]/15 text-[var(--vc-accent)]"
+                  : "text-[var(--vc-text-secondary)] hover:text-white"
               }`}
             >
               {tab}
@@ -41,10 +41,10 @@ export function HeroPreview() {
         {/* Input area */}
         <div className="px-4 py-4">
           <div className="flex gap-2">
-            <div className="flex-1 rounded-lg border border-[#22263A] bg-[#0D0F14] px-3 py-2.5 text-sm text-[#8B8FA8]">
+            <div className="flex-1 rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2.5 text-sm text-[var(--vc-text-secondary)]">
               https://v.douyin.com/iY7xK9Pn/
             </div>
-            <button className="shrink-0 rounded-lg bg-[#4F8EFF] px-4 py-2.5 text-sm font-semibold text-white">
+            <button className="shrink-0 rounded-lg bg-[var(--vc-accent)] px-4 py-2.5 text-sm font-semibold text-white">
               生成
             </button>
           </div>
@@ -67,7 +67,7 @@ export function HeroPreview() {
                   <div className="ml-0.5 h-0 w-0 border-y-[4px] border-l-[7px] border-y-transparent border-l-white/80" />
                 </div>
               </div>
-              <div className="mt-1.5 text-center text-[11px] text-[#8B8FA8]">
+              <div className="mt-1.5 text-center text-[11px] text-[var(--vc-text-secondary)]">
                 {t.label}
               </div>
             </motion.div>

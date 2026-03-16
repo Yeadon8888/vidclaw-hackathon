@@ -44,7 +44,7 @@ export function ScriptOutput() {
       {/* Hook + 剧情 */}
       <div className="vc-card vc-animate-in p-4" style={{ animationDelay: "50ms" }}>
         <div className="mb-2 text-sm text-[var(--vc-text-secondary)]">
-          <span className="font-semibold text-purple-400">🎯 Hook：</span>
+          <span className="font-semibold text-[var(--vc-accent)]">🎯 Hook：</span>
           {script.hook}
         </div>
         <div className="text-sm text-[var(--vc-text-secondary)]">{script.plot_summary}</div>
@@ -60,7 +60,7 @@ export function ScriptOutput() {
               className="rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)]/50 p-3"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs text-purple-400">
+                <span className="text-xs text-[var(--vc-accent)]">
                   镜头 {shot.id} · {shot.camera} · {shot.duration_s}s
                 </span>
                 <CopyButton text={shot.sora_prompt} />

@@ -40,7 +40,7 @@ export default async function SettingsPage() {
           </div>
           <div>
             <span className="text-[var(--vc-text-muted)]">积分余额</span>
-            <p className="text-lg font-bold tabular-nums text-purple-400">{user.credits}</p>
+            <p className="text-lg font-bold tabular-nums text-[var(--vc-accent)]">{user.credits}</p>
           </div>
         </div>
       </div>

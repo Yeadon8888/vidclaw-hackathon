@@ -33,7 +33,7 @@ export function ProcessLog() {
               ? "bg-[var(--vc-error)]"
               : stage === "DONE"
                 ? "bg-[var(--vc-success)]"
-                : "animate-pulse bg-purple-500"
+                : "animate-pulse bg-[var(--vc-accent)]"
           }`}
         />
         <span className="text-sm font-medium text-zinc-300">

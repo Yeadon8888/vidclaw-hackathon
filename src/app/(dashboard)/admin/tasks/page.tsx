@@ -39,7 +39,7 @@ export default function AdminTasksPage() {
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-500/20 text-yellow-400",
     analyzing: "bg-blue-500/20 text-blue-400",
-    generating: "bg-purple-500/20 text-purple-400",
+    generating: "bg-[var(--vc-accent)]/20 text-[var(--vc-accent)]",
     polling: "bg-cyan-500/20 text-cyan-400",
     done: "bg-green-500/20 text-green-400",
     failed: "bg-red-500/20 text-red-400",
@@ -59,7 +59,7 @@ export default function AdminTasksPage() {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white transition-colors focus:border-purple-500 focus:outline-none"
+          className="rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white transition-colors focus:border-[var(--vc-accent)] focus:outline-none"
         >
           <option value="">全部状态</option>
           <option value="pending">等待中</option>

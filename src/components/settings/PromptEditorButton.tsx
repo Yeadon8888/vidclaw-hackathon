@@ -10,7 +10,7 @@ export function PromptEditorButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-[var(--vc-radius-md)] bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-500"
+        className="vc-gradient-btn rounded-[var(--vc-radius-md)] px-4 py-2 text-sm font-medium"
       >
         自定义 Prompt
       </button>

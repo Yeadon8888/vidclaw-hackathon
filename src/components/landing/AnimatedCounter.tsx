@@ -44,7 +44,7 @@ export function AnimatedCounter({
   const formatted = value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}K` : `${value}`;
 
   return (
-    <span ref={ref} className="font-mono-data tabular-nums text-[#4F8EFF]">
+    <span ref={ref} className="font-mono-data tabular-nums text-[var(--vc-accent)]">
       {prefix}{inView ? formatted : "0"}{suffix}
     </span>
   );

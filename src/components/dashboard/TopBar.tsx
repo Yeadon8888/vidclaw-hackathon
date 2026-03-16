@@ -35,7 +35,7 @@ export function TopBar({ user, onMenuClick }: TopBarProps) {
           <UserIcon className="hidden h-4 w-4 sm:block" />
           <span className="max-w-[120px] truncate sm:max-w-none">{user.name ?? user.email}</span>
           {user.role === "admin" && (
-            <span className="rounded-[var(--vc-radius-sm)] bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-400">
+            <span className="rounded-[var(--vc-radius-sm)] bg-[var(--vc-accent)]/15 px-1.5 py-0.5 text-xs font-medium text-[var(--vc-accent)]">
               管理员
             </span>
           )}

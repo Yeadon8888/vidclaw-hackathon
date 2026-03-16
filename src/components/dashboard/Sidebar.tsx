@@ -72,7 +72,7 @@ export function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProps) {
               href={link.href}
               className={`group flex items-center gap-3 rounded-[var(--vc-radius-md)] px-3 py-2.5 text-sm transition-all duration-150 ${
                 isActive
-                  ? "bg-purple-500/12 text-purple-400 shadow-[inset_0_0_0_1px_rgba(168,85,247,0.15)]"
+                  ? "bg-[var(--vc-accent)]/12 text-[var(--vc-accent)] shadow-[inset_0_0_0_1px_rgba(13,204,242,0.15)]"
                   : "text-[var(--vc-text-secondary)] hover:bg-white/[0.04] hover:text-white"
               }`}
             >
