@@ -3,8 +3,6 @@ import { requireAuth } from "@/lib/auth";
 import { generateLimiter } from "@/lib/rate-limit";
 import { generateScript, generateCopy } from "@/lib/gemini";
 import {
-  listAssets,
-  isUploadGatewayEnabled,
   fetchAssetBuffer,
   loadUserPrompts,
 } from "@/lib/storage/gateway";
@@ -16,8 +14,8 @@ import {
   downloadVideoFromUrl,
 } from "@/lib/tikhub";
 import { db } from "@/lib/db";
-import { tasks, taskItems, creditTxns, users, models } from "@/lib/db/schema";
-import { eq, sql, and } from "drizzle-orm";
+import { tasks, taskItems, creditTxns, users, models, userAssets } from "@/lib/db/schema";
+import { eq, sql, and, desc } from "drizzle-orm";
 
 export const maxDuration = 300; // Vercel max
 
@@ -78,15 +76,17 @@ export async function POST(req: NextRequest) {
 
         log(`用户 ${user.email} | 余额 ${user.credits} | 本次消耗 ${totalCost} 积分`);
 
-        // ── Step 1: Get user reference images ──
+        // ── Step 1: Get user reference images (from DB, newest first) ──
         let imageUrls: string[] = [];
-        if (isUploadGatewayEnabled()) {
-          const assets = await listAssets(user.id);
-          imageUrls = assets
-            .filter((a) => /\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(a.url))
-            .map((a) => a.url);
-          log(`参考图 ${imageUrls.length} 张`);
-        }
+        const dbAssets = await db
+          .select({ url: userAssets.url })
+          .from(userAssets)
+          .where(and(eq(userAssets.userId, user.id), eq(userAssets.type, "image")))
+          .orderBy(desc(userAssets.createdAt))
+          .limit(10);
+        imageUrls = dbAssets.map((a) => a.url);
+        log(`参考图 ${imageUrls.length} 张`);
+
         if (imageUrls.length === 0) {
           send({
             type: "error",

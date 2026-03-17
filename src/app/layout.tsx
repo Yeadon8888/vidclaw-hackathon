@@ -46,6 +46,9 @@ export const metadata: Metadata = {
   ],
   metadataBase: new URL(SITE_URL),
   alternates: { canonical: "/" },
+  verification: {
+    google: "-1beEzZn8Yipt2lsWvNX6MWN4-JE7yl37EUwYxSFE28",
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
