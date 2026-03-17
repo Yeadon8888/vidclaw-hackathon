@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { generateLimiter } from "@/lib/rate-limit";
 import { generateScript, generateCopy } from "@/lib/gemini";
 import {
   listAssets,
@@ -25,6 +26,16 @@ function sseData(obj: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Rate limit check ──
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rl = generateLimiter.check(clientIp);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "请求过于频繁，请稍后再试。" },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } },
+    );
+  }
+
   // ── Auth check ──
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -254,41 +265,24 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // ── Step 4b: Immediate Sora task submission ──
-        const videoParams: VideoParams = {
-          prompt: soraPrompt,
-          imageUrls: imageUrls.slice(0, 1),
-          orientation: params.orientation,
-          duration: params.duration,
-          count,
-          model: params.model,
-        };
+        // ── Step 4b: Deduct credits FIRST, then submit Sora task ──
+        // This prevents the "submit task but fail to deduct" race condition.
 
-        send({ type: "stage", stage: "GENERATE", message: "提交 Sora 任务..." });
+        // Deduct credits atomically — WHERE credits >= cost prevents overdraft
+        const [deducted] = await db
+          .update(users)
+          .set({ credits: sql`${users.credits} - ${totalCost}` })
+          .where(and(eq(users.id, user.id), sql`${users.credits} >= ${totalCost}`))
+          .returning({ credits: users.credits });
 
-        // Build per-model API overrides
-        const apiOverrides: ApiOverrides = {
-          apiKey: modelRow?.apiKey,
-          baseUrl: modelRow?.baseUrl,
-        };
-
-        let providerTaskIds: string[];
-        try {
-          providerTaskIds = await createTasks(videoParams, apiOverrides);
-          log(`任务已提交: ${providerTaskIds.join(", ")}`);
-        } catch (e) {
-          send({
-            type: "error",
-            code: "SORA_UNAVAILABLE",
-            message: String(e).slice(0, 200),
-            sora_prompt: scriptResult.full_sora_prompt,
-          });
+        if (!deducted) {
+          send({ type: "error", code: "INSUFFICIENT_CREDITS", message: "积分不足，请充值后重试。" });
           send({ type: "done" });
           controller.close();
           return;
         }
 
-        // ── Step 5: Save to database + deduct credits ──
+        // Create DB task record (status: generating)
         const taskType = type === "theme" ? "theme" : type === "url" ? "url" : "remix";
         const [task] = await db
           .insert(tasks)
@@ -311,31 +305,6 @@ export async function POST(req: NextRequest) {
           })
           .returning();
 
-        // Insert task items for each provider task
-        for (const providerTaskId of providerTaskIds) {
-          await db.insert(taskItems).values({
-            taskId: task.id,
-            providerTaskId,
-            status: "PENDING",
-          });
-        }
-
-        // Deduct credits atomically — WHERE credits >= cost prevents overdraft
-        const [deducted] = await db
-          .update(users)
-          .set({ credits: sql`${users.credits} - ${totalCost}` })
-          .where(and(eq(users.id, user.id), sql`${users.credits} >= ${totalCost}`))
-          .returning({ credits: users.credits });
-
-        if (!deducted) {
-          // Race condition: another request already consumed the credits
-          await db.update(tasks).set({ status: "failed", errorMessage: "积分不足（并发扣费）" }).where(eq(tasks.id, task.id));
-          send({ type: "error", code: "INSUFFICIENT_CREDITS", message: "积分不足，请充值后重试。" });
-          send({ type: "done" });
-          controller.close();
-          return;
-        }
-
         // Record credit transaction
         await db.insert(creditTxns).values({
           userId: user.id,
@@ -346,6 +315,71 @@ export async function POST(req: NextRequest) {
           taskId: task.id,
           balanceAfter: deducted.credits,
         });
+
+        // ── Step 5: Submit Sora task ──
+        const videoParams: VideoParams = {
+          prompt: soraPrompt,
+          imageUrls: imageUrls.slice(0, 1),
+          orientation: params.orientation,
+          duration: params.duration,
+          count,
+          model: params.model,
+        };
+
+        send({ type: "stage", stage: "GENERATE", message: "提交 Sora 任务..." });
+
+        const apiOverrides: ApiOverrides = {
+          apiKey: modelRow?.apiKey,
+          baseUrl: modelRow?.baseUrl,
+        };
+
+        let providerTaskIds: string[];
+        try {
+          providerTaskIds = await createTasks(videoParams, apiOverrides);
+          log(`任务已提交: ${providerTaskIds.join(", ")}`);
+        } catch (e) {
+          // Sora submission failed — refund credits
+          await db
+            .update(users)
+            .set({ credits: sql`${users.credits} + ${totalCost}` })
+            .where(eq(users.id, user.id));
+
+          const [refundedUser] = await db
+            .select({ credits: users.credits })
+            .from(users)
+            .where(eq(users.id, user.id))
+            .limit(1);
+
+          await db.insert(creditTxns).values({
+            userId: user.id,
+            type: "refund",
+            amount: totalCost,
+            reason: "视频提交失败自动退款",
+            taskId: task.id,
+            balanceAfter: refundedUser?.credits ?? 0,
+          });
+
+          await db.update(tasks).set({ status: "failed", creditsCost: 0, errorMessage: String(e).slice(0, 500) }).where(eq(tasks.id, task.id));
+
+          send({
+            type: "error",
+            code: "SORA_UNAVAILABLE",
+            message: "视频生成服务暂时不可用，积分已自动退还。",
+            sora_prompt: scriptResult.full_sora_prompt,
+          });
+          send({ type: "done" });
+          controller.close();
+          return;
+        }
+
+        // Insert task items for each provider task
+        for (const providerTaskId of providerTaskIds) {
+          await db.insert(taskItems).values({
+            taskId: task.id,
+            providerTaskId,
+            status: "PENDING",
+          });
+        }
 
         // ── Step 6: Return task IDs ──
         send({
@@ -358,7 +392,8 @@ export async function POST(req: NextRequest) {
         send({ type: "done" });
         controller.close();
       } catch (e) {
-        send({ type: "error", code: "INTERNAL", message: String(e).slice(0, 300) });
+        console.error("[generate] Internal error:", e);
+        send({ type: "error", code: "INTERNAL", message: "服务内部错误，请稍后重试。如果问题持续，请联系客服。" });
         send({ type: "done" });
         controller.close();
       }

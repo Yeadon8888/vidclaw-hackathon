@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Clock, CheckCircle, XCircle, Loader2, AlertTriangle, CalendarClock } from "lucide-react";
 import type { Task } from "@/lib/db/schema";
 
@@ -28,39 +28,38 @@ function daysUntilExpiry(createdAt: string | Date): number {
 export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   const [taskList, setTaskList] = useState<Task[]>(initialTasks);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const taskListRef = useRef(taskList);
+  taskListRef.current = taskList;
 
-  // Refresh active tasks by fetching updated task list from server
-  const refreshActiveTasks = useCallback(async () => {
-    const hasActive = taskList.some((t) => ACTIVE_STATUSES.includes(t.status));
-    if (!hasActive) return;
-
-    try {
-      const res = await fetch("/api/tasks/refresh");
-      if (!res.ok) return;
-      const data = await res.json();
-      setTaskList(data.tasks);
-    } catch {
-      // silently ignore network errors
-    }
-  }, [taskList]);
-
+  // Stable refresh function via ref — no dependency on taskList
   useEffect(() => {
     const hasActive = taskList.some((t) => ACTIVE_STATUSES.includes(t.status));
+
     if (hasActive && !timerRef.current) {
-      // Start polling
-      timerRef.current = setInterval(refreshActiveTasks, POLL_INTERVAL);
+      timerRef.current = setInterval(async () => {
+        const current = taskListRef.current;
+        if (!current.some((t) => ACTIVE_STATUSES.includes(t.status))) return;
+        try {
+          const res = await fetch("/api/tasks/refresh");
+          if (!res.ok) return;
+          const data = await res.json();
+          setTaskList(data.tasks);
+        } catch {
+          // silently ignore
+        }
+      }, POLL_INTERVAL);
     } else if (!hasActive && timerRef.current) {
-      // Stop polling once all tasks are terminal
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, [taskList, refreshActiveTasks]);
+  }, [taskList]);
 
   if (taskList.length === 0) {
     return (

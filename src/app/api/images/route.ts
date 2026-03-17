@@ -54,6 +54,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // Validate file type (whitelist images only)
+    const ALLOWED_TYPES = new Set([
+      "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff",
+    ]);
+    if (!ALLOWED_TYPES.has(file.type)) {
+      return NextResponse.json(
+        { error: "不支持的文件类型。仅支持 JPEG、PNG、GIF、WebP、BMP、TIFF 格式。" },
+        { status: 400 },
+      );
+    }
+
+    // Validate file size (max 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { error: "文件过大，最大支持 10MB。" },
+        { status: 400 },
+      );
+    }
+
     const buffer = await file.arrayBuffer();
     const asset = await uploadAsset({
       userId: user.id,

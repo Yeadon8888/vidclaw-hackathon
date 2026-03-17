@@ -22,9 +22,61 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500"],
 });
 
+const SITE_URL = "https://video.yeadon.top";
+
 export const metadata: Metadata = {
-  title: "VidClaw — AI 短视频生成",
-  description: "AI 驱动的短视频自动生成平台，支持抖音/TikTok 二创与主题生产",
+  title: {
+    default: "VidClaw V2 — AI Video Generator for E-Commerce",
+    template: "%s | VidClaw V2",
+  },
+  description:
+    "Create high-converting product videos in minutes. Paste a Douyin/TikTok link or describe a theme — AI generates scripts, videos, and marketing copy automatically. Powered by VEO 3.1 & Sora.",
+  keywords: [
+    "AI video generator",
+    "product video maker",
+    "e-commerce video",
+    "short video automation",
+    "Sora video",
+    "VEO video generation",
+    "Douyin video remix",
+    "TikTok video creator",
+    "AI 短视频生成",
+    "带货视频",
+    "抖音二创",
+  ],
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/" },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
+  openGraph: {
+    type: "website",
+    siteName: "VidClaw V2",
+    title: "VidClaw V2 — AI Video Generator for E-Commerce",
+    description:
+      "Paste a link or describe a theme. AI generates product videos with scripts and marketing copy in minutes.",
+    url: SITE_URL,
+    locale: "zh_CN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "VidClaw V2 — AI Video Generator",
+    description:
+      "Create product videos in minutes with AI. Supports Douyin/TikTok remix, video upload, and theme-to-video.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({

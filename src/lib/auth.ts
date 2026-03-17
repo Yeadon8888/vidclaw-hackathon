@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -12,9 +13,11 @@ export interface AuthContext {
 
 /**
  * Authenticate the current request and return the app user.
+ * Wrapped with React cache() so multiple calls within the same
+ * request/render (e.g. layout + page) only hit Supabase + DB once.
  * Returns null if not authenticated.
  */
-export async function getAuthUser(): Promise<AuthContext | null> {
+export const getAuthUser = cache(async (): Promise<AuthContext | null> => {
   const supabase = await createClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
@@ -30,7 +33,7 @@ export async function getAuthUser(): Promise<AuthContext | null> {
   if (appUser.status !== "active") return null;
 
   return { user: appUser, supabaseUserId: supabaseUser.id };
-}
+});
 
 /**
  * Require auth — returns 401 response if not authenticated.

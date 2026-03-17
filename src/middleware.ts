@@ -13,7 +13,8 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (favicon file)
      * - public folder assets
+     * - SEO files (sitemap.xml, robots.txt, etc.)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sitemap\\.xml|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|xml|txt|ico)$).*)",
   ],
 };

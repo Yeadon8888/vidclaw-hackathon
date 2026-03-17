@@ -14,10 +14,12 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get("limit") ?? "20")));
   const offset = (page - 1) * limit;
 
-  const conditions = search
+  // Escape SQL LIKE wildcards to prevent pattern injection
+  const escapedSearch = search.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+  const conditions = escapedSearch
     ? or(
-        ilike(users.email, `%${search}%`),
-        ilike(users.name, `%${search}%`),
+        ilike(users.email, `%${escapedSearch}%`),
+        ilike(users.name, `%${escapedSearch}%`),
       )
     : undefined;
 

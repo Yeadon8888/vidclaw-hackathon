@@ -23,8 +23,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  // Determine asset type from MIME
+  // Validate file type (whitelist images and common video formats)
+  const ALLOWED_TYPES = new Set([
+    "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff",
+    "video/mp4", "video/quicktime", "video/webm",
+  ]);
+  if (!ALLOWED_TYPES.has(file.type)) {
+    return NextResponse.json(
+      { error: "不支持的文件类型。仅支持常见图片和视频格式。" },
+      { status: 400 },
+    );
+  }
+
+  // Validate file size (images: 10MB, videos: 50MB)
   const isVideo = file.type.startsWith("video/");
+  const MAX_SIZE = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (file.size > MAX_SIZE) {
+    return NextResponse.json(
+      { error: `文件过大，最大支持 ${isVideo ? "50" : "10"}MB。` },
+      { status: 400 },
+    );
+  }
+
+  // Determine asset type from MIME
   const assetType = isVideo ? "video" as const : "image" as const;
 
   let r2Asset;

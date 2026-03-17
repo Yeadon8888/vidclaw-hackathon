@@ -244,3 +244,64 @@ body {
 
 .font-heading { font-family: var(--font-jakarta), var(--font-inter), system-ui, sans-serif; }
 .font-mono-data { font-family: var(--font-jetbrains), ui-monospace, monospace; }
+
+/* ─────── Blog content ─────── */
+.blog-content h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+.blog-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.blog-content p {
+  margin-bottom: 1rem;
+  line-height: 1.8;
+  color: #94a3b8;
+}
+.blog-content ul {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+  color: #94a3b8;
+}
+.blog-content ul li {
+  margin-bottom: 0.4rem;
+  line-height: 1.7;
+}
+.blog-content strong {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+.blog-content a {
+  color: var(--vc-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.blog-content a:hover {
+  opacity: 0.8;
+}
+.blog-content table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+}
+.blog-content th,
+.blog-content td {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--vc-border);
+  text-align: left;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+.blog-content th {
+  background: var(--vc-bg-surface);
+  color: #e2e8f0;
+  font-weight: 600;
+}

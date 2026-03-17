@@ -25,22 +25,28 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh session if needed
+  // Refresh session from cookie (no remote call) — route protection only.
+  // Server Components / API routes use getUser() for verified identity.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const { pathname } = request.nextUrl;
 
-  // Public routes that don't require auth
+  // Public routes that don't require auth (whitelist mode)
   const isPublicRoute =
     pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
     pathname.startsWith("/auth") ||
+    pathname.startsWith("/blog") ||
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/") ||
-    pathname === "/api/health";
+    pathname === "/api/health" ||
+    pathname === "/api/announcements" ||
+    pathname.startsWith("/api/cron/") ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/robots.txt";
 
   // If no user and not on public route → redirect to login
   if (!user && !isPublicRoute) {

@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.workers.dev",
       },
+      {
+        protocol: "https",
+        hostname: "vc-upload.yeadon.top",
+      },
     ],
   },
   // Serverless function timeout for SSE streaming (Vercel Pro)
@@ -24,6 +28,35 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: ".",
   },
+  // Security headers
+  headers: async () => [
+    {
+      source: "/(.*)",
+      headers: [
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
+        },
+        {
+          key: "Content-Security-Policy",
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: https://*.r2.dev https://*.workers.dev https://*.bltcy.ai https://vc-upload.yeadon.top",
+            "media-src 'self' blob: https://*.r2.dev https://*.workers.dev https://*.bltcy.ai https://vc-upload.yeadon.top",
+            "font-src 'self' data:",
+            "connect-src 'self' https://*.supabase.co https://*.r2.dev https://*.workers.dev https://*.bltcy.ai https://vc-upload.yeadon.top",
+            "frame-ancestors 'none'",
+          ].join("; "),
+        },
+      ],
+    },
+  ],
 };
 
 export default nextConfig;

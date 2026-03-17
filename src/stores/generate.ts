@@ -87,7 +87,10 @@ export const useGenerateStore = create<GenerateState>((set) => ({
   params: defaultParams,
 
   setStage: (stage) => set({ stage }),
-  addLog: (msg) => set((s) => ({ logs: [...s.logs, msg] })),
+  addLog: (msg) => set((s) => {
+    const logs = [...s.logs, msg];
+    return { logs: logs.length > 200 ? logs.slice(-200) : logs };
+  }),
   setScript: (script) => set({ script }),
   setVideoUrls: (urls) => set({ videoUrls: urls }),
   setError: (code, message, soraPrompt) =>

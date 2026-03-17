@@ -7,32 +7,56 @@ import { ShowcaseGrid } from "@/components/landing/ShowcaseGrid";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { HeroDemoAnimation } from "@/components/landing/HeroDemoAnimation";
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "VidClaw V2",
+  applicationCategory: "MultimediaApplication",
+  operatingSystem: "Web",
+  description:
+    "AI-powered product video generator. Paste a Douyin/TikTok link or describe a theme to auto-generate videos with scripts and marketing copy.",
+  url: "https://video.yeadon.top",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+    description: "Free tier available",
+  },
+};
+
 export default async function LandingPage() {
   const supabase = await createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const ctaHref = user ? "/generate" : "/register";
   const ctaLabel = user ? "进入工作台" : "免费开始创作";
 
   return (
     <div className="min-h-screen vc-mesh-gradient text-white">
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ═══════════════════ 导航栏 ═══════════════════ */}
       <header className="sticky top-0 z-50 border-b border-[var(--vc-accent)]/10 bg-[var(--vc-bg-root)]/80 backdrop-blur-md">
         <div className="mx-auto flex h-20 max-w-[1280px] items-center justify-between px-6 lg:px-12">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3" aria-label="VidClaw V2 首页">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--vc-accent)]">
-              <Film className="h-5 w-5 text-[var(--vc-bg-root)]" />
+              <Film className="h-5 w-5 text-[var(--vc-bg-root)]" aria-hidden="true" />
             </div>
             <span className="font-heading text-xl font-extrabold tracking-tight">
               VidClaw<span className="text-[var(--vc-accent)]">v2</span>
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-semibold text-[var(--vc-text-secondary)] md:flex">
+          <nav className="hidden items-center gap-8 text-sm font-semibold text-[var(--vc-text-secondary)] md:flex" aria-label="主导航">
             <a href="#features" className="transition-colors duration-200 hover:text-[var(--vc-accent)]">功能特性</a>
             <a href="#showcase" className="transition-colors duration-200 hover:text-[var(--vc-accent)]">案例展示</a>
+            <Link href="/blog" className="transition-colors duration-200 hover:text-[var(--vc-accent)]">Blog</Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -64,8 +88,9 @@ export default async function LandingPage() {
         </div>
       </header>
 
+      <main>
       {/* ═══════════════════ Hero ═══════════════════ */}
-      <section className="relative overflow-hidden px-6 pb-20 pt-20 lg:px-12 lg:pt-32">
+      <section className="relative overflow-hidden px-6 pb-20 pt-20 lg:px-12 lg:pt-32" aria-label="产品介绍">
         {/* Animated orbs */}
         <div className="vc-orb absolute -left-32 -top-32 h-[500px] w-[500px] bg-[var(--vc-accent)]/20" />
         <div className="vc-orb absolute -right-48 top-20 h-[400px] w-[400px] bg-cyan-500/10" style={{ animationDelay: '2s' }} />
@@ -209,13 +234,14 @@ export default async function LandingPage() {
           </ScrollReveal>
         </div>
       </section>
+      </main>
 
       {/* ═══════════════════ Footer ═══════════════════ */}
       <footer className="border-t border-[var(--vc-border)] px-6 py-8 lg:px-12">
         <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-3 opacity-50 transition-opacity hover:opacity-100">
             <div className="flex h-8 w-8 items-center justify-center rounded bg-[var(--vc-accent)]">
-              <Film className="h-4 w-4 text-[var(--vc-bg-root)]" />
+              <Film className="h-4 w-4 text-[var(--vc-bg-root)]" aria-hidden="true" />
             </div>
             <span className="font-heading text-sm font-bold">VidClaw</span>
           </div>

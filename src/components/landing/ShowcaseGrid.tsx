@@ -128,7 +128,7 @@ function VideoCard({
       {/* Poster image: always rendered, hidden when video plays */}
       <Image
         src={item.img}
-        alt={item.title}
+        alt={`AI 生成的${item.title}产品广告视频封面 — ${item.desc}`}
         fill
         className={`object-cover transition-opacity duration-500 ${videoReady ? "opacity-0" : "opacity-100"}`}
         sizes={sizes}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Send, Upload, X, Film, Zap, CalendarClock } from "lucide-react";
 import { useGenerateStore, type PollResult } from "@/stores/generate";
 import { ParamBar } from "@/components/generate/ParamBar";
@@ -28,6 +28,15 @@ export default function GeneratePage() {
   const [scheduled, setScheduled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Cancel all in-flight requests when component unmounts
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      pollingRef.current = false;
+    };
+  }, []);
 
   const stage = useGenerateStore((s) => s.stage);
   const errorMessage = useGenerateStore((s) => s.errorMessage);
@@ -47,6 +56,11 @@ export default function GeneratePage() {
     input: string;
     modification?: string;
   }) {
+    // Abort any previous in-flight generation
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     reset();
     setStage("ANALYZE");
     pollingRef.current = false;
@@ -56,6 +70,7 @@ export default function GeneratePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, params, scheduled }),
+        signal: ac.signal,
       });
 
       if (!res.ok) {
@@ -117,6 +132,7 @@ export default function GeneratePage() {
         }
       }
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError("NETWORK", String(e));
       pollingRef.current = false;
     }
@@ -126,16 +142,20 @@ export default function GeneratePage() {
     const POLL_INTERVAL = 15_000;
     const MAX_POLLS = 40;
     const STALE_LIMIT = 5;
+    const signal = abortRef.current?.signal;
 
     let lastProgressKey = "";
     let staleCount = 0;
 
     for (let poll = 0; poll < MAX_POLLS; poll++) {
+      if (signal?.aborted) return;
       await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+      if (signal?.aborted) return;
 
       try {
         const res = await fetch(
-          `/api/generate/status?taskIds=${encodeURIComponent(taskIds.join(","))}`
+          `/api/generate/status?taskIds=${encodeURIComponent(taskIds.join(","))}`,
+          { signal }
         );
         if (!res.ok) {
           addLog(`[轮询] #${poll + 1} 失败: HTTP ${res.status}`);
@@ -194,10 +214,12 @@ export default function GeneratePage() {
           lastProgressKey = currentKey;
         }
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
         addLog(`[轮询] 异常: ${String(e).slice(0, 100)}`);
       }
     }
 
+    if (signal?.aborted) return;
     setError("POLL_TIMEOUT", "视频生成超时，请检查任务后台。", soraPrompt);
     pollingRef.current = false;
   }

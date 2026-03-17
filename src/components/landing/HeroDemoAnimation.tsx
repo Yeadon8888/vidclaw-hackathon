@@ -31,6 +31,7 @@ export function HeroDemoAnimation() {
   const [linkText, setLinkText] = useState("");
   const [modText, setModText] = useState("");
   const [btnPressed, setBtnPressed] = useState(false);
+  const [pageVisible, setPageVisible] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -39,6 +40,13 @@ export function HeroDemoAnimation() {
     const v = document.createElement("video");
     v.preload = "auto";
     v.src = VIDEO_SRC;
+  }, []);
+
+  /* Pause animation when page is hidden */
+  useEffect(() => {
+    const handler = () => setPageVisible(!document.hidden);
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
   /* Cleanup */
@@ -52,6 +60,8 @@ export function HeroDemoAnimation() {
   /* ── State machine ── */
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    // Don't advance animation when page is hidden
+    if (!pageVisible) return;
 
     switch (phase) {
       case "idle":
@@ -122,14 +132,10 @@ export function HeroDemoAnimation() {
         break;
 
       case "result":
-        if (videoRef.current) {
-          videoRef.current.currentTime = 0;
-          videoRef.current.play().catch(() => {});
-        }
         timerRef.current = setTimeout(() => setPhase("idle"), 6000);
         break;
     }
-  }, [phase]);
+  }, [phase, pageVisible]);
 
   const isGenerating = ["analyzing", "scripting", "rendering"].includes(phase);
   const showResult = phase === "result";
@@ -164,6 +170,18 @@ export function HeroDemoAnimation() {
           ))}
         </div>
 
+        {/* Always-mounted video (hidden when not result phase, so it stays loaded) */}
+        <video
+          ref={videoRef}
+          preload="auto"
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 h-0 w-0 opacity-0 pointer-events-none"
+        >
+          <source src={VIDEO_SRC} type="video/mp4" />
+        </video>
+
         {/* ── Content area ── */}
         <AnimatePresence mode="wait">
           {showResult ? (
@@ -183,55 +201,25 @@ export function HeroDemoAnimation() {
                   </span>
                 </div>
 
-                <div className="flex gap-3">
-                  {/* Real playing video */}
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className="overflow-hidden rounded-lg"
-                      style={{ aspectRatio: "9/16", maxHeight: 200 }}
-                    >
-                      <video
-                        ref={videoRef}
-                        poster={VIDEO_POSTER}
-                        preload="auto"
-                        muted
-                        loop
-                        playsInline
-                        className="h-full w-full object-cover"
-                      >
-                        <source src={VIDEO_SRC} type="video/mp4" />
-                      </video>
-                    </div>
-                    <div className="mt-1.5 text-center text-[11px] text-[var(--vc-text-secondary)]">
-                      护肤精华液
-                    </div>
+                {/* Single video player — renders from the always-mounted video via canvas or just uses a second element */}
+                <div className="mx-auto max-w-[220px]">
+                  <div
+                    className="overflow-hidden rounded-xl shadow-lg shadow-black/30"
+                    style={{ aspectRatio: "9/16" }}
+                  >
+                    <video
+                      poster={VIDEO_POSTER}
+                      src={VIDEO_SRC}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
                   </div>
-
-                  {/* Placeholder thumbnails */}
-                  {[
-                    {
-                      label: "蓝牙耳机",
-                      gradient: "from-[#0D3A6B] to-[#061E3A]",
-                    },
-                    {
-                      label: "运动鞋",
-                      gradient: "from-[#5C3A00] to-[#2E1D00]",
-                    },
-                  ].map((t) => (
-                    <div key={t.label} className="flex-1 min-w-0">
-                      <div
-                        className={`flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-b ${t.gradient}`}
-                        style={{ aspectRatio: "9/16", maxHeight: 200 }}
-                      >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
-                          <div className="ml-0.5 h-0 w-0 border-y-[4px] border-l-[7px] border-y-transparent border-l-white/80" />
-                        </div>
-                      </div>
-                      <div className="mt-1.5 text-center text-[11px] text-[var(--vc-text-secondary)]">
-                        {t.label}
-                      </div>
-                    </div>
-                  ))}
+                  <div className="mt-2 text-center text-xs text-[var(--vc-text-secondary)]">
+                    护肤精华液 · AI 生成
+                  </div>
                 </div>
               </div>
             </motion.div>
