@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { isUploadGatewayEnabled, uploadAsset } from "@/lib/storage/gateway";
+import {
+  isUploadGatewayEnabled,
+  uploadAsset,
+  uploadVideo,
+} from "@/lib/storage/gateway";
 import { db } from "@/lib/db";
 import { userAssets } from "@/lib/db/schema";
+import { inspectAssetUpload } from "@/lib/assets/upload";
 
 /** POST /api/assets/upload — upload an image or video file */
 export async function POST(req: NextRequest) {
@@ -23,40 +28,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  // Validate file type (whitelist images and common video formats)
-  const ALLOWED_TYPES = new Set([
-    "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff",
-    "video/mp4", "video/quicktime", "video/webm",
-  ]);
-  if (!ALLOWED_TYPES.has(file.type)) {
+  const inspection = inspectAssetUpload({
+    type: file.type,
+    size: file.size,
+  });
+  if (!inspection.ok) {
     return NextResponse.json(
-      { error: "不支持的文件类型。仅支持常见图片和视频格式。" },
-      { status: 400 },
+      { error: inspection.error },
+      { status: inspection.status },
     );
   }
-
-  // Validate file size (images: 10MB, videos: 50MB)
-  const isVideo = file.type.startsWith("video/");
-  const MAX_SIZE = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json(
-      { error: `文件过大，最大支持 ${isVideo ? "50" : "10"}MB。` },
-      { status: 400 },
-    );
-  }
-
-  // Determine asset type from MIME
-  const assetType = isVideo ? "video" as const : "image" as const;
 
   let r2Asset;
   try {
     const buffer = await file.arrayBuffer();
-    r2Asset = await uploadAsset({
-      userId: user.id,
-      filename: file.name,
-      data: buffer,
-      contentType: file.type || "application/octet-stream",
-    });
+    r2Asset =
+      inspection.assetType === "video"
+        ? await uploadVideo({
+            userId: user.id,
+            filename: file.name,
+            data: buffer,
+            contentType: file.type || "application/octet-stream",
+          })
+        : await uploadAsset({
+            userId: user.id,
+            filename: file.name,
+            data: buffer,
+            contentType: file.type || "application/octet-stream",
+          });
   } catch (err) {
     console.error("[upload] R2 upload failed:", err);
     return NextResponse.json(
@@ -70,7 +69,7 @@ export async function POST(req: NextRequest) {
     .insert(userAssets)
     .values({
       userId: user.id,
-      type: assetType,
+      type: inspection.assetType,
       r2Key: r2Asset.key,
       url: r2Asset.url,
       filename: file.name,

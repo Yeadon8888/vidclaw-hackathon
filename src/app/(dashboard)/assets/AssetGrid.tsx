@@ -3,6 +3,113 @@
 import { useState, useRef } from "react";
 import { Upload, Trash2, Image as ImageIcon } from "lucide-react";
 import type { UserAsset } from "@/lib/db/schema";
+import {
+  inspectReferenceImageUpload,
+  MAX_REFERENCE_IMAGE_UPLOAD_BYTES,
+} from "@/lib/assets/image-preflight";
+
+const MAX_REFERENCE_IMAGE_DIMENSION = 2048;
+
+async function prepareImageForUpload(file: File): Promise<File> {
+  const preflight = inspectReferenceImageUpload({
+    type: file.type,
+    size: file.size,
+  });
+  if (!preflight.ok) {
+    throw new Error(preflight.error);
+  }
+
+  if (!preflight.needsCompression) {
+    return file;
+  }
+
+  if (file.type === "image/gif") {
+    throw new Error("GIF 文件超过 4MB，请先压缩后再上传。");
+  }
+
+  const bitmap = await readImageBitmap(file);
+  const scale = Math.min(
+    1,
+    MAX_REFERENCE_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height),
+  );
+  const targetWidth = Math.max(1, Math.round(bitmap.width * scale));
+  const targetHeight = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("浏览器暂不支持图片压缩，请换一张图片再试。");
+  }
+
+  context.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+  closeImageBitmap(bitmap);
+
+  const qualities = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5];
+  for (const quality of qualities) {
+    const blob = await canvasToBlob(canvas, "image/webp", quality);
+    if (blob.size <= MAX_REFERENCE_IMAGE_UPLOAD_BYTES) {
+      return new File(
+        [blob],
+        renameFileExtension(file.name, "webp"),
+        { type: "image/webp" },
+      );
+    }
+  }
+
+  throw new Error("图片压缩后仍超过 4MB，请换一张更小的图片。");
+}
+
+function renameFileExtension(filename: string, nextExtension: string): string {
+  const dotIndex = filename.lastIndexOf(".");
+  const basename = dotIndex > 0 ? filename.slice(0, dotIndex) : filename;
+  return `${basename}.${nextExtension}`;
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error("图片压缩失败，请换一张图片再试。"));
+    }, type, quality);
+  });
+}
+
+async function readImageBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  if ("createImageBitmap" in window) {
+    return window.createImageBitmap(file);
+  }
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("图片读取失败，请换一张图片再试。"));
+    };
+    image.src = url;
+  });
+}
+
+function closeImageBitmap(bitmap: ImageBitmap | HTMLImageElement) {
+  if ("close" in bitmap && typeof bitmap.close === "function") {
+    bitmap.close();
+  }
+}
 
 export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
   const [assets, setAssets] = useState(initialAssets);
@@ -19,51 +126,25 @@ export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
     setError(null);
     try {
       for (const file of files) {
-        // Step 1: get upload token
-        const tokenRes = await fetch("/api/assets/upload-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: file.name, contentType: file.type }),
-        });
-        if (!tokenRes.ok) {
-          setError(`获取上传凭证失败 (HTTP ${tokenRes.status})`);
-          continue;
-        }
-        const { uploadUrl, apiKey } = await tokenRes.json();
+        const uploadFile = await prepareImageForUpload(file);
+        const formData = new FormData();
+        formData.append("file", uploadFile);
 
-        // Step 2: upload directly to Cloudflare Worker
-        const directRes = await fetch(uploadUrl, {
+        const uploadRes = await fetch("/api/assets/upload", {
           method: "POST",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-            "X-Upload-Key": apiKey,
-          },
-          body: file,
+          body: formData,
         });
-        if (!directRes.ok) {
-          setError(`上传失败 (HTTP ${directRes.status})`);
-          continue;
-        }
-        const r2Result = await directRes.json();
 
-        // Step 3: register in DB
-        const regRes = await fetch("/api/assets/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            key: r2Result.key,
-            url: r2Result.url,
-            size: r2Result.size,
-            filename: file.name,
-            contentType: file.type,
-          }),
-        });
-        if (regRes.ok) {
-          const asset = await regRes.json();
+        if (uploadRes.ok) {
+          const asset = await uploadRes.json();
           setAssets((prev) => [asset, ...prev]);
         } else {
-          const data = await regRes.json().catch(() => ({}));
-          setError(data.error || `注册资源失败 (HTTP ${regRes.status})`);
+          const data = await uploadRes.json().catch(() => ({}));
+          setError(
+            uploadRes.status === 413
+              ? "图片体积超过平台限制，请换一张更小的图片。"
+              : data.error || `上传失败 (HTTP ${uploadRes.status})`,
+          );
         }
       }
     } catch (err) {
@@ -108,6 +189,10 @@ export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
           <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
         </div>
       )}
+
+      <p className="text-xs text-[var(--vc-text-dim)]">
+        大图会自动压缩后上传，建议单张图片控制在 4MB 内。
+      </p>
 
       {/* Grid of uploaded assets */}
       {assets.length === 0 ? (

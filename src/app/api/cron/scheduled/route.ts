@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { tasks, taskItems, models } from "@/lib/db/schema";
+import { tasks, taskItems } from "@/lib/db/schema";
 import { eq, lte, and } from "drizzle-orm";
 import { createTasks, type ApiOverrides } from "@/lib/video/plato";
 import type { VideoParams } from "@/lib/video/types";
+import {
+  failTaskAndRefund,
+  getModelApiOverrides,
+} from "@/lib/tasks/reconciliation";
 
 /**
  * GET /api/cron/scheduled — Execute scheduled tasks whose scheduledAt has arrived.
@@ -30,24 +34,26 @@ export async function GET(req: NextRequest) {
   const errors: string[] = [];
 
   for (const task of scheduledTasks) {
-    try {
-      // Load model config for API overrides
-      let apiOverrides: ApiOverrides = {};
-      if (task.modelId) {
-        const [modelRow] = await db
-          .select()
-          .from(models)
-          .where(eq(models.id, task.modelId))
-          .limit(1);
-        if (modelRow) {
-          apiOverrides = { apiKey: modelRow.apiKey, baseUrl: modelRow.baseUrl };
-        }
-      }
+    const [claimedTask] = await db
+      .update(tasks)
+      .set({ status: "generating", scheduledAt: null, errorMessage: null })
+      .where(
+        and(
+          eq(tasks.id, task.id),
+          eq(tasks.status, "scheduled"),
+        ),
+      )
+      .returning();
 
-      const p = task.paramsJson as { orientation: string; duration: number; count: number; model: string; imageUrls?: string[] };
+    if (!claimedTask) continue;
+
+    try {
+      const apiOverrides: ApiOverrides = await getModelApiOverrides(claimedTask.modelId);
+
+      const p = claimedTask.paramsJson as { orientation: string; duration: number; count: number; model: string; imageUrls?: string[] };
 
       const videoParams: VideoParams = {
-        prompt: task.soraPrompt ?? "",
+        prompt: claimedTask.soraPrompt ?? "",
         imageUrls: p?.imageUrls ?? [],
         orientation: (p?.orientation as "portrait" | "landscape") ?? "portrait",
         duration: (p?.duration === 8 ? 8 : p?.duration === 10 ? 10 : 15) as 8 | 10 | 15,
@@ -58,16 +64,10 @@ export async function GET(req: NextRequest) {
       // Submit to video provider
       const providerTaskIds = await createTasks(videoParams, apiOverrides);
 
-      // Update task status
-      await db
-        .update(tasks)
-        .set({ status: "generating", scheduledAt: null })
-        .where(eq(tasks.id, task.id));
-
       // Insert task items
       for (const providerTaskId of providerTaskIds) {
         await db.insert(taskItems).values({
-          taskId: task.id,
+          taskId: claimedTask.id,
           providerTaskId,
           status: "PENDING",
         });
@@ -75,12 +75,16 @@ export async function GET(req: NextRequest) {
 
       processed++;
     } catch (e) {
-      const msg = `Task ${task.id}: ${String(e).slice(0, 200)}`;
+      const msg = `Task ${claimedTask.id}: ${String(e).slice(0, 200)}`;
       errors.push(msg);
-      await db
-        .update(tasks)
-        .set({ status: "failed", errorMessage: String(e).slice(0, 500) })
-        .where(eq(tasks.id, task.id));
+      await failTaskAndRefund({
+        taskId: claimedTask.id,
+        userId: claimedTask.userId,
+        refundAmount: claimedTask.creditsCost,
+        errorMessage: String(e).slice(0, 500),
+        refundReason: "定时任务提交失败自动退款",
+        allowedStatuses: ["generating"],
+      });
     }
   }
 

@@ -2,16 +2,13 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { queryTaskStatus, type ApiOverrides } from "@/lib/video/plato";
 import { db } from "@/lib/db";
+import { tasks, taskItems } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import {
-  tasks,
-  taskItems,
-  models,
-  users,
-  creditTxns,
-} from "@/lib/db/schema";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
-
-const ACTIVE_STATUSES = ["pending", "analyzing", "generating", "polling"] as const;
+  ACTIVE_TASK_STATUSES,
+  finalizeTaskIfTerminal,
+  getModelApiOverrides,
+} from "@/lib/tasks/reconciliation";
 
 /**
  * GET /api/tasks/refresh
@@ -36,7 +33,7 @@ export async function GET() {
 
   // Find tasks that are still active
   const activeTasks = userTasks.filter((t) =>
-    (ACTIVE_STATUSES as readonly string[]).includes(t.status),
+    (ACTIVE_TASK_STATUSES as readonly string[]).includes(t.status),
   );
 
   // For each active task, poll its sub-task items from the provider
@@ -53,17 +50,7 @@ export async function GET() {
     if (pendingItems.length === 0 && items.length === 0) continue;
 
     // Resolve model API overrides
-    let apiOverrides: ApiOverrides = {};
-    if (task.modelId) {
-      const [modelRow] = await db
-        .select({ apiKey: models.apiKey, baseUrl: models.baseUrl })
-        .from(models)
-        .where(eq(models.id, task.modelId))
-        .limit(1);
-      if (modelRow) {
-        apiOverrides = { apiKey: modelRow.apiKey, baseUrl: modelRow.baseUrl };
-      }
-    }
+    const apiOverrides: ApiOverrides = await getModelApiOverrides(task.modelId);
 
     // Poll each pending item
     for (const item of pendingItems) {
@@ -97,91 +84,12 @@ export async function GET() {
     );
 
     if (allItemsDone) {
-      const successCount = updatedItems.filter((i) => i.status === "SUCCESS").length;
-      const failedCount = updatedItems.filter((i) => i.status === "FAILED").length;
-      const totalCount = updatedItems.length;
-      const successUrls = updatedItems
-        .filter((i) => i.status === "SUCCESS" && i.resultUrl)
-        .map((i) => i.resultUrl!);
-      const hasAnySuccess = successCount > 0;
-
-      // Calculate refund for failed items
-      const perItemCost =
-        totalCount > 0 ? Math.floor(task.creditsCost / totalCount) : 0;
-      const refundAmount = failedCount * perItemCost;
-      const actualCost = task.creditsCost - refundAmount;
-
-      // Use atomic status update to prevent double-processing:
-      // Only update if the task is still in an active state.
-      const [updated] = await db
-        .update(tasks)
-        .set({
-          status: hasAnySuccess ? "done" : "failed",
-          resultUrls: successUrls,
-          creditsCost: hasAnySuccess ? actualCost : 0,
-          completedAt: new Date(),
-          ...(!hasAnySuccess
-            ? { errorMessage: "视频生成失败，积分已自动退还" }
-            : failedCount > 0
-              ? { errorMessage: `${successCount}/${totalCount} 成功，失败部分积分已退还` }
-              : {}),
-        })
-        .where(
-          and(
-            eq(tasks.id, task.id),
-            inArray(tasks.status, [...ACTIVE_STATUSES]),
-          ),
-        )
-        .returning({ id: tasks.id });
-
-      // Only refund if we actually updated the task (prevents double refund)
-      if (updated && refundAmount > 0) {
-        await db
-          .update(users)
-          .set({ credits: sql`${users.credits} + ${refundAmount}` })
-          .where(eq(users.id, user.id));
-
-        const [u] = await db
-          .select({ credits: users.credits })
-          .from(users)
-          .where(eq(users.id, user.id))
-          .limit(1);
-
-        await db.insert(creditTxns).values({
-          userId: user.id,
-          type: "refund",
-          amount: refundAmount,
-          reason: hasAnySuccess
-            ? `部分失败退款 (${failedCount}/${totalCount} 失败)`
-            : `生成失败自动退款`,
-          taskId: task.id,
-          balanceAfter: u?.credits ?? 0,
-        });
-      }
-
-      // Full failure — refund entire cost
-      if (updated && !hasAnySuccess && task.creditsCost > 0 && refundAmount === 0) {
-        // Edge case: perItemCost rounds to 0 but creditsCost > 0
-        await db
-          .update(users)
-          .set({ credits: sql`${users.credits} + ${task.creditsCost}` })
-          .where(eq(users.id, user.id));
-
-        const [u] = await db
-          .select({ credits: users.credits })
-          .from(users)
-          .where(eq(users.id, user.id))
-          .limit(1);
-
-        await db.insert(creditTxns).values({
-          userId: user.id,
-          type: "refund",
-          amount: task.creditsCost,
-          reason: `生成失败自动退款`,
-          taskId: task.id,
-          balanceAfter: u?.credits ?? 0,
-        });
-      }
+      await finalizeTaskIfTerminal({
+        taskId: task.id,
+        userId: user.id,
+        creditsCost: task.creditsCost,
+        items: updatedItems,
+      });
     }
   }
 

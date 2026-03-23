@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { tasks, taskItems, users, creditTxns, models } from "@/lib/db/schema";
-import { eq, and, inArray, lte, sql } from "drizzle-orm";
+import { tasks, taskItems } from "@/lib/db/schema";
+import { eq, and, inArray, lte } from "drizzle-orm";
 import { queryTaskStatus, type ApiOverrides } from "@/lib/video/plato";
+import {
+  ACTIVE_TASK_STATUSES,
+  failTaskAndRefund,
+  finalizeTaskIfTerminal,
+  getModelApiOverrides,
+} from "@/lib/tasks/reconciliation";
 
 const TIMEOUT_MINUTES = 60;
 
@@ -44,18 +50,23 @@ export async function GET(req: NextRequest) {
       .from(taskItems)
       .where(eq(taskItems.taskId, task.id));
 
-    let apiOverrides: ApiOverrides = {};
-    if (task.modelId) {
-      const [modelRow] = await db
-        .select({ apiKey: models.apiKey, baseUrl: models.baseUrl })
-        .from(models)
-        .where(eq(models.id, task.modelId))
-        .limit(1);
-      if (modelRow) apiOverrides = { apiKey: modelRow.apiKey, baseUrl: modelRow.baseUrl };
+    if (items.length === 0) {
+      const refundedTask = await failTaskAndRefund({
+        taskId: task.id,
+        userId: task.userId,
+        refundAmount: task.creditsCost,
+        errorMessage: `超时未完成（>${TIMEOUT_MINUTES}分钟），积分已自动退还`,
+        refundReason: `生成超时自动退款 (任务 ${task.id.slice(0, 8)}...)`,
+        allowedStatuses: ACTIVE_TASK_STATUSES,
+      });
+      if (refundedTask) {
+        resolved++;
+        if (task.creditsCost > 0) refunded++;
+      }
+      continue;
     }
 
-    let hasSuccess = false;
-    const successUrls: string[] = [];
+    const apiOverrides: ApiOverrides = await getModelApiOverrides(task.modelId);
 
     for (const item of items) {
       if (!item.providerTaskId) continue;
@@ -73,70 +84,33 @@ export async function GET(req: NextRequest) {
               : {}),
           })
           .where(eq(taskItems.id, item.id));
-
-        if (result.status === "SUCCESS" && result.url) {
-          hasSuccess = true;
-          successUrls.push(result.url);
-        }
       } catch {
-        // If provider query fails, treat as failed
+        // Skip terminal reconciliation on ambiguous provider failures.
       }
     }
 
-    if (hasSuccess) {
-      // Some videos succeeded — mark done, no refund.
-      // Atomic: only update if still in active state (prevents double-processing).
-      await db
-        .update(tasks)
-        .set({ status: "done", resultUrls: successUrls, completedAt: new Date() })
-        .where(
-          and(
-            eq(tasks.id, task.id),
-            inArray(tasks.status, ["generating", "polling", "analyzing"]),
-          ),
-        );
+    const updatedItems = await db
+      .select()
+      .from(taskItems)
+      .where(eq(taskItems.taskId, task.id));
+
+    const finalization = await finalizeTaskIfTerminal({
+      taskId: task.id,
+      userId: task.userId,
+      creditsCost: task.creditsCost,
+      items: updatedItems,
+      allowedStatuses: ACTIVE_TASK_STATUSES,
+      settlementMessages: {
+        allFailed: `超时未完成（>${TIMEOUT_MINUTES}分钟），积分已自动退还`,
+      },
+      refundMessages: {
+        allFailed: `生成超时自动退款 (任务 ${task.id.slice(0, 8)}...)`,
+      },
+    });
+
+    if (finalization.updated) {
       resolved++;
-    } else {
-      // All failed or still stuck — mark failed and refund credits.
-      // Atomic: only update if still active (prevents double refund).
-      const [updated] = await db
-        .update(tasks)
-        .set({
-          status: "failed",
-          errorMessage: `超时未完成（>${TIMEOUT_MINUTES}分钟），积分已自动退还`,
-          completedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(tasks.id, task.id),
-            inArray(tasks.status, ["generating", "polling", "analyzing"]),
-          ),
-        )
-        .returning({ id: tasks.id });
-
-      // Only refund if we actually transitioned the task
-      if (updated && task.creditsCost > 0) {
-        await db
-          .update(users)
-          .set({ credits: sql`${users.credits} + ${task.creditsCost}` })
-          .where(eq(users.id, task.userId));
-
-        // Get current balance for txn record
-        const [u] = await db
-          .select({ credits: users.credits })
-          .from(users)
-          .where(eq(users.id, task.userId))
-          .limit(1);
-
-        await db.insert(creditTxns).values({
-          userId: task.userId,
-          type: "refund",
-          amount: task.creditsCost,
-          reason: `生成超时自动退款 (任务 ${task.id.slice(0, 8)}...)`,
-          taskId: task.id,
-          balanceAfter: u?.credits ?? 0,
-        });
-
+      if ((finalization.settlement?.refundAmount ?? 0) > 0) {
         refunded++;
       }
     }
