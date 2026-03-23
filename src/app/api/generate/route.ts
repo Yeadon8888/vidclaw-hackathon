@@ -16,6 +16,7 @@ import {
 import { db } from "@/lib/db";
 import { tasks, taskItems, creditTxns, users, models, userAssets } from "@/lib/db/schema";
 import { eq, sql, and, desc } from "drizzle-orm";
+import { failTaskAndRefund } from "@/lib/tasks/reconciliation";
 
 export const maxDuration = 300; // Vercel max
 
@@ -210,53 +211,64 @@ export async function POST(req: NextRequest) {
           const scheduledAt = new Date(target.getTime() - 8 * 60 * 60 * 1000); // back to UTC
 
           const taskType = type === "theme" ? "theme" : type === "url" ? "url" : "remix";
-          const [task] = await db
-            .insert(tasks)
-            .values({
+          const scheduledResult = await db.transaction(async (tx) => {
+            const [task] = await tx
+              .insert(tasks)
+              .values({
+                userId: user.id,
+                type: taskType as "theme" | "remix" | "url",
+                status: "scheduled",
+                modelId: modelRow?.id,
+                inputText: taskType === "remix" ? (modification || "视频二创") : input,
+                soraPrompt,
+                scriptJson: scriptResult,
+                creditsCost: totalCost,
+                scheduledAt,
+                paramsJson: {
+                  orientation: params.orientation,
+                  duration: params.duration,
+                  count,
+                  platform: params.platform ?? "douyin",
+                  model: modelSlug,
+                  imageUrls: imageUrls.slice(0, 1),
+                },
+              })
+              .returning();
+
+            const [deducted] = await tx
+              .update(users)
+              .set({ credits: sql`${users.credits} - ${totalCost}` })
+              .where(and(eq(users.id, user.id), sql`${users.credits} >= ${totalCost}`))
+              .returning({ credits: users.credits });
+
+            if (!deducted) {
+              await tx
+                .update(tasks)
+                .set({ status: "failed", errorMessage: "积分不足（并发扣费）" })
+                .where(eq(tasks.id, task.id));
+
+              return { task, deducted: null };
+            }
+
+            await tx.insert(creditTxns).values({
               userId: user.id,
-              type: taskType as "theme" | "remix" | "url",
-              status: "scheduled",
+              type: "consume",
+              amount: -totalCost,
+              reason: `定时生成 (${modelSlug} × ${count})`,
               modelId: modelRow?.id,
-              inputText: taskType === "remix" ? (modification || "视频二创") : input,
-              soraPrompt,
-              scriptJson: scriptResult,
-              creditsCost: totalCost,
-              scheduledAt,
-              paramsJson: {
-                orientation: params.orientation,
-                duration: params.duration,
-                count,
-                platform: params.platform ?? "douyin",
-                model: modelSlug,
-                imageUrls: imageUrls.slice(0, 1),
-              },
-            })
-            .returning();
+              taskId: task.id,
+              balanceAfter: deducted.credits,
+            });
 
-          // Deduct credits atomically — WHERE credits >= cost prevents overdraft
-          const [deducted] = await db
-            .update(users)
-            .set({ credits: sql`${users.credits} - ${totalCost}` })
-            .where(and(eq(users.id, user.id), sql`${users.credits} >= ${totalCost}`))
-            .returning({ credits: users.credits });
+            return { task, deducted };
+          });
 
-          if (!deducted) {
-            await db.update(tasks).set({ status: "failed", errorMessage: "积分不足（并发扣费）" }).where(eq(tasks.id, task.id));
+          if (!scheduledResult.deducted) {
             send({ type: "error", code: "INSUFFICIENT_CREDITS", message: "积分不足，请充值后重试。" });
             send({ type: "done" });
             controller.close();
             return;
           }
-
-          await db.insert(creditTxns).values({
-            userId: user.id,
-            type: "consume",
-            amount: -totalCost,
-            reason: `定时生成 (${modelSlug} × ${count})`,
-            modelId: modelRow?.id,
-            taskId: task.id,
-            balanceAfter: deducted.credits,
-          });
 
           log(`任务已加入定时托管，将在凌晨 2:00 执行`);
           send({ type: "stage", stage: "DONE" });
@@ -268,53 +280,57 @@ export async function POST(req: NextRequest) {
         // ── Step 4b: Deduct credits FIRST, then submit Sora task ──
         // This prevents the "submit task but fail to deduct" race condition.
 
-        // Deduct credits atomically — WHERE credits >= cost prevents overdraft
-        const [deducted] = await db
-          .update(users)
-          .set({ credits: sql`${users.credits} - ${totalCost}` })
-          .where(and(eq(users.id, user.id), sql`${users.credits} >= ${totalCost}`))
-          .returning({ credits: users.credits });
+        const taskType = type === "theme" ? "theme" : type === "url" ? "url" : "remix";
+        const immediateResult = await db.transaction(async (tx) => {
+          const [deducted] = await tx
+            .update(users)
+            .set({ credits: sql`${users.credits} - ${totalCost}` })
+            .where(and(eq(users.id, user.id), sql`${users.credits} >= ${totalCost}`))
+            .returning({ credits: users.credits });
 
-        if (!deducted) {
+          if (!deducted) return null;
+
+          const [task] = await tx
+            .insert(tasks)
+            .values({
+              userId: user.id,
+              type: taskType as "theme" | "remix" | "url",
+              status: "generating",
+              modelId: modelRow?.id,
+              inputText: taskType === "remix" ? (modification || "视频二创") : input,
+              soraPrompt,
+              scriptJson: scriptResult,
+              creditsCost: totalCost,
+              paramsJson: {
+                orientation: params.orientation,
+                duration: params.duration,
+                count,
+                platform: params.platform ?? "douyin",
+                model: modelSlug,
+              },
+            })
+            .returning();
+
+          await tx.insert(creditTxns).values({
+            userId: user.id,
+            type: "consume",
+            amount: -totalCost,
+            reason: `视频生成 (${modelSlug} × ${count})`,
+            modelId: modelRow?.id,
+            taskId: task.id,
+            balanceAfter: deducted.credits,
+          });
+
+          return { task };
+        });
+
+        if (!immediateResult) {
           send({ type: "error", code: "INSUFFICIENT_CREDITS", message: "积分不足，请充值后重试。" });
           send({ type: "done" });
           controller.close();
           return;
         }
-
-        // Create DB task record (status: generating)
-        const taskType = type === "theme" ? "theme" : type === "url" ? "url" : "remix";
-        const [task] = await db
-          .insert(tasks)
-          .values({
-            userId: user.id,
-            type: taskType as "theme" | "remix" | "url",
-            status: "generating",
-            modelId: modelRow?.id,
-            inputText: taskType === "remix" ? (modification || "视频二创") : input,
-            soraPrompt,
-            scriptJson: scriptResult,
-            creditsCost: totalCost,
-            paramsJson: {
-              orientation: params.orientation,
-              duration: params.duration,
-              count,
-              platform: params.platform ?? "douyin",
-              model: modelSlug,
-            },
-          })
-          .returning();
-
-        // Record credit transaction
-        await db.insert(creditTxns).values({
-          userId: user.id,
-          type: "consume",
-          amount: -totalCost,
-          reason: `视频生成 (${modelSlug} × ${count})`,
-          modelId: modelRow?.id,
-          taskId: task.id,
-          balanceAfter: deducted.credits,
-        });
+        const { task } = immediateResult;
 
         // ── Step 5: Submit Sora task ──
         const videoParams: VideoParams = {
@@ -338,28 +354,23 @@ export async function POST(req: NextRequest) {
           providerTaskIds = await createTasks(videoParams, apiOverrides);
           log(`任务已提交: ${providerTaskIds.join(", ")}`);
         } catch (e) {
-          // Sora submission failed — refund credits
-          await db
-            .update(users)
-            .set({ credits: sql`${users.credits} + ${totalCost}` })
-            .where(eq(users.id, user.id));
-
-          const [refundedUser] = await db
-            .select({ credits: users.credits })
-            .from(users)
-            .where(eq(users.id, user.id))
-            .limit(1);
-
-          await db.insert(creditTxns).values({
-            userId: user.id,
-            type: "refund",
-            amount: totalCost,
-            reason: "视频提交失败自动退款",
+          console.error("[generate] Provider task creation failed", {
             taskId: task.id,
-            balanceAfter: refundedUser?.credits ?? 0,
+            userId: user.id,
+            modelSlug,
+            count,
+            type,
+            error: String(e),
           });
 
-          await db.update(tasks).set({ status: "failed", creditsCost: 0, errorMessage: String(e).slice(0, 500) }).where(eq(tasks.id, task.id));
+          await failTaskAndRefund({
+            taskId: task.id,
+            userId: user.id,
+            refundAmount: totalCost,
+            errorMessage: String(e).slice(0, 500),
+            refundReason: "视频提交失败自动退款",
+            allowedStatuses: ["generating"],
+          });
 
           const errMsg = String(e);
           let userMessage = "视频生成服务暂时不可用，积分已自动退还。";

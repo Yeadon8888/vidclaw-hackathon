@@ -49,10 +49,12 @@ function extractErrorMessage(payload: unknown): string {
     const maybeError = obj.error;
     if (maybeError && typeof maybeError === "object") {
       const errorObj = maybeError as Record<string, unknown>;
-      return String(errorObj.message || errorObj.code || "Unknown API error");
+      const message = String(errorObj.message || errorObj.code || "").trim();
+      if (message) return message;
     }
     if ("message" in obj) {
-      return String(obj.message);
+      const message = String(obj.message || "").trim();
+      if (message) return message;
     }
   }
   return "Unknown API error";
@@ -96,15 +98,26 @@ async function apiRequest(
       });
 
       const text = await response.text();
-      const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+      let payload: Record<string, unknown> = {};
+      if (text) {
+        try {
+          payload = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          payload = { raw: text.slice(0, 500) };
+        }
+      }
 
       if (!response.ok) {
         const message = extractErrorMessage(payload);
+        const rawSnippet = text.trim().slice(0, 500);
+        const detail = rawSnippet && rawSnippet !== message
+          ? ` | body=${rawSnippet}`
+          : "";
         if (attempt < 2 && isRetryableOverload(response.status, message)) {
           await new Promise((resolve) => setTimeout(resolve, 15_000 * (attempt + 1)));
           continue;
         }
-        throw new Error(`HTTP ${response.status}: ${message}`);
+        throw new Error(`HTTP ${response.status}: ${message}${detail}`);
       }
 
       return payload;
@@ -129,7 +142,7 @@ export async function createTasks(params: VideoParams, overrides?: ApiOverrides)
     model: params.model || getModel(),
     images: params.imageUrls ?? [],
     aspect_ratio: toAspectRatio(params.orientation),
-    duration: String(params.duration),
+    duration: params.duration,
     watermark: true,
     private: false,
     ...(getHdEnabled() ? { hd: true } : {}),
