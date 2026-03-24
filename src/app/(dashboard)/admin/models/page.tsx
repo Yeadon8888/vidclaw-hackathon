@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { X } from "lucide-react";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 import {
   buildDefaultParamsPreview,
@@ -361,24 +362,35 @@ export default function AdminModelsPage() {
 
       {(editing !== null || creating) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:p-6"
           onClick={closeModal}
         >
           <div
-            className="vc-glass w-full max-w-2xl space-y-4 rounded-2xl p-6"
+            className="vc-glass my-4 flex w-full max-w-xl flex-col rounded-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-white">
-              {editing ? `配置模型：${editing.name}` : "新增模型"}
-            </h2>
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--vc-border)] px-5 py-4">
+              <h2 className="text-lg font-bold text-white">
+                {editing ? `配置模型：${editing.name}` : "新增模型"}
+              </h2>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-            {error && (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
-                {error}
-              </div>
-            )}
+            <div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-5 py-4">
+              {error && (
+                <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+                  {error}
+                </div>
+              )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-zinc-400">显示名</label>
                 <input
@@ -452,13 +464,13 @@ export default function AdminModelsPage() {
                 />
                 启用该模型
               </label>
-            </div>
+              </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-400">
-                常用参数
-              </label>
-              <div className="mt-1 grid gap-4 rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-root)] p-4 sm:grid-cols-2">
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-zinc-400">
+                  常用参数
+                </label>
+                <div className="mt-1 grid gap-4 rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-root)] p-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-zinc-400">默认画幅</label>
                   <select
@@ -545,38 +557,39 @@ export default function AdminModelsPage() {
                   </div>
                 </div>
               </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-zinc-400">
+                  高级参数 JSON
+                </label>
+                <textarea
+                  value={form.paramsEditor.extraParamsText}
+                  onChange={(event) =>
+                    updateParamsEditor({ extraParamsText: event.target.value })
+                  }
+                  rows={6}
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 font-mono text-sm text-white outline-none focus:border-[var(--vc-accent)]"
+                />
+                <p className="mt-2 text-xs text-zinc-500">
+                  这里填写 provider 专属参数，例如 `negative_prompt`、`seed`，不要重复填写上面的常用字段
+                </p>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-zinc-400">
+                  合并后的 defaultParams(JSON)
+                </label>
+                <textarea
+                  value={defaultParamsPreview}
+                  readOnly
+                  rows={6}
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)]/70 px-3 py-2 font-mono text-sm text-zinc-300 outline-none"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-400">
-                高级参数 JSON
-              </label>
-              <textarea
-                value={form.paramsEditor.extraParamsText}
-                onChange={(event) =>
-                  updateParamsEditor({ extraParamsText: event.target.value })
-                }
-                rows={8}
-                className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 font-mono text-sm text-white outline-none focus:border-[var(--vc-accent)]"
-              />
-              <p className="mt-2 text-xs text-zinc-500">
-                这里填写 provider 专属参数，例如 `negative_prompt`、`seed`，不要重复填写上面的常用字段
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-400">
-                合并后的 defaultParams(JSON)
-              </label>
-              <textarea
-                value={defaultParamsPreview}
-                readOnly
-                rows={8}
-                className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)]/70 px-3 py-2 font-mono text-sm text-zinc-300 outline-none"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 border-t border-[var(--vc-border)] px-5 py-4">
               <button
                 onClick={closeModal}
                 className="rounded-lg px-4 py-2 text-sm text-zinc-400 hover:text-white"
