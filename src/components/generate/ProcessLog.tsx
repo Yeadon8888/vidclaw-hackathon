@@ -16,10 +16,23 @@ const stageLabels: Record<string, string> = {
 export function ProcessLog() {
   const stage = useGenerateStore((s) => s.stage);
   const logs = useGenerateStore((s) => s.logs);
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = containerRef.current;
+    if (!container) return;
+
+    const distanceToBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const shouldStickToBottom = distanceToBottom < 48;
+
+    if (shouldStickToBottom) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [logs]);
 
   if (stage === "IDLE" && logs.length === 0) return null;
@@ -40,7 +53,10 @@ export function ProcessLog() {
           {stageLabels[stage] ?? stage}
         </span>
       </div>
-      <div className="max-h-48 overflow-y-auto p-3 font-mono text-xs text-[var(--vc-text-muted)]">
+      <div
+        ref={containerRef}
+        className="max-h-48 overflow-y-auto p-3 font-mono text-xs text-[var(--vc-text-muted)]"
+      >
         {logs.map((log, i) => (
           <div key={i} className="py-0.5 leading-relaxed">
             {log}

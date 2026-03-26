@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Download, Play, X } from "lucide-react";
 import { useGenerateStore } from "@/stores/generate";
@@ -18,9 +19,26 @@ export function VideoResults() {
 
     return (
       <div className="vc-card vc-animate-in space-y-4 p-4">
-        <h3 className="text-sm font-semibold text-zinc-300">
-          生成进度 {!allDone && <span className="animate-pulse text-[var(--vc-accent)]">●</span>}
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)]/40 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-300">
+              生成进度 {!allDone && <span className="animate-pulse text-[var(--vc-accent)]">●</span>}
+            </h3>
+            {!allDone && (
+              <p className="mt-1 text-xs text-[var(--vc-text-muted)]">
+                视频会继续在云端生成。你可以先离开这个页面，稍后去历史任务查看结果。
+              </p>
+            )}
+          </div>
+          {!allDone && (
+            <Link
+              href="/tasks"
+              className="inline-flex items-center rounded-full border border-[var(--vc-border)] px-3 py-1.5 text-xs text-[var(--vc-text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-white"
+            >
+              去历史任务查看
+            </Link>
+          )}
+        </div>
         <div className="space-y-2">
           {pollResults.map((r) => (
             <div

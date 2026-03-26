@@ -7,7 +7,11 @@ import { taskItems, tasks } from "@/lib/db/schema";
 import type { ScriptResult, TaskParamsSnapshot } from "@/lib/video/types";
 import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { buildGenerateReplayHref } from "@/lib/generate/preset";
-import { extractHashtags, getTaskSourceModeLabel } from "@/lib/tasks/presentation";
+import {
+  buildPublishHashtagText,
+  extractHashtags,
+  getTaskSourceModeLabel,
+} from "@/lib/tasks/presentation";
 
 function Section({
   title,
@@ -51,6 +55,7 @@ export default async function TaskDetailPage({
   const paramsJson = (task.paramsJson ?? {}) as TaskParamsSnapshot;
   const script = (task.scriptJson ?? null) as ScriptResult | null;
   const hashtags = extractHashtags(script?.copy?.caption);
+  const hashtagText = buildPublishHashtagText(script?.copy?.caption);
   const sourceModeLabel = getTaskSourceModeLabel(paramsJson.sourceMode);
   const replayHref = buildGenerateReplayHref(
     paramsJson.sourceMode === "batch"
@@ -262,8 +267,11 @@ export default async function TaskDetailPage({
             <div className="rounded-2xl border border-[var(--vc-border)] p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-white">标签</p>
-                <CopyTextButton text={hashtags.join(" ")} />
+                <CopyTextButton text={hashtagText} />
               </div>
+              <p className="mb-3 text-xs text-[var(--vc-text-muted)]">
+                已按发布可用格式整理，最多 8 个，复制后可直接粘贴到 TikTok / 抖音发布页。
+              </p>
               {hashtags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {hashtags.map((tag) => (

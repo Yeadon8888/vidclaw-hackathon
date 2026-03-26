@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { useGenerateStore } from "@/stores/generate";
+import { buildPublishHashtagText, extractHashtags } from "@/lib/tasks/presentation";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -31,6 +32,8 @@ export function ScriptOutput() {
   if (!script) return null;
 
   const displayPrompt = soraPrompt ?? script.full_sora_prompt;
+  const hashtags = extractHashtags(script.copy.caption);
+  const hashtagText = buildPublishHashtagText(script.copy.caption);
 
   return (
     <div className="space-y-4">
@@ -103,6 +106,33 @@ export function ScriptOutput() {
               <CopyButton text={text} />
             </div>
           ))}
+        </div>
+        <div className="mt-4 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)]/50 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white">发布标签</p>
+              <p className="mt-1 text-xs text-[var(--vc-text-muted)]">
+                最多 8 个，复制后可直接粘贴到 TikTok / 抖音发布页。
+              </p>
+            </div>
+            <CopyButton text={hashtagText} />
+          </div>
+          {hashtags.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {hashtags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-[var(--vc-bg-surface)] px-3 py-1 text-xs text-[var(--vc-accent)]"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-[var(--vc-text-muted)]">
+              暂未识别到标签。建议在正文末尾保留空格分隔的话题格式。
+            </p>
+          )}
         </div>
       </div>
     </div>

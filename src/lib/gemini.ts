@@ -31,7 +31,7 @@ const JSON_OUTPUT_SUFFIX = `
   "full_sora_prompt": "Complete English Sora prompt combining all shots for direct use",
   "copy": {
     "title": "视频标题（≤20字）",
-    "caption": "正文文案，50-100字，带#话题",
+    "caption": "正文文案，50-100字，末尾附带5-8个可直接发布的平台标签，标签使用空格分隔，不要Markdown格式",
     "first_comment": "首评，30-60字"
   }
 }
@@ -40,6 +40,8 @@ const JSON_OUTPUT_SUFFIX = `
 - camera 值只能是 close-up、wide、medium、overhead 之一
 - 只输出 JSON，不要任何解释文字、代码块标记（不要 \`\`\`json）
 - JSON 必须合法可解析
+- caption 末尾的标签最多 8 个，使用纯文本格式，例如：#tag1 #tag2 #tag3
+- 不要输出 Markdown、不要用 \`**\` 包裹标签、不要用逗号或列表格式输出标签
 `;
 
 function getApiKey(): string {
@@ -259,7 +261,7 @@ function buildDefaultPrompt(
   "full_sora_prompt": "Complete English Sora prompt combining all shots for direct use",
   "copy": {
     "title": "视频标题（≤20字）",
-    "caption": "正文文案，50-100字，带#话题",
+    "caption": "正文文案，50-100字，末尾附带5-8个可直接发布的平台标签，标签使用空格分隔，不要Markdown格式",
     "first_comment": "首评，30-60字"
   }
 }`;
@@ -268,6 +270,9 @@ function buildDefaultPrompt(
 - shots 数组每个镜头的 sora_prompt 用英文
 - full_sora_prompt 是所有镜头描述合并的完整英文提示词，可以直接提交给 Sora
 - camera 只能是 close-up、wide、medium、overhead 之一
+- copy.title / caption / first_comment 必须是可直接发布的成品文案
+- caption 末尾必须附带 5-8 个标签，使用空格分隔的纯文本格式，例如：#skincare #beauty #viral
+- 标签不能带 Markdown、不能使用 ** 包裹、不能用逗号或顿号连接
 - 只输出 JSON，不要任何额外文字、代码块标记`;
 
   if (type === "video") {

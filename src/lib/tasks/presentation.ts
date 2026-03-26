@@ -1,5 +1,7 @@
 import type { TaskParamsSnapshot } from "@/lib/video/types";
 
+const HASHTAG_LIMIT = 8;
+
 export function getTaskSourceModeLabel(
   sourceMode?: TaskParamsSnapshot["sourceMode"],
 ): string {
@@ -19,5 +21,9 @@ export function getTaskSourceModeLabel(
 
 export function extractHashtags(text?: string | null): string[] {
   if (!text) return [];
-  return [...new Set(text.match(/#[\p{L}\p{N}_-]+/gu) ?? [])];
+  return [...new Set(text.match(/#[\p{L}\p{N}_-]+/gu) ?? [])].slice(0, HASHTAG_LIMIT);
+}
+
+export function buildPublishHashtagText(text?: string | null): string {
+  return extractHashtags(text).join(" ");
 }
