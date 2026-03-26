@@ -8,6 +8,7 @@ import {
   finalizeTaskIfTerminal,
 } from "@/lib/tasks/reconciliation";
 import { processPendingBatchTasks } from "@/lib/tasks/batch-processing";
+import { processDueScheduledTasks } from "@/lib/tasks/scheduled";
 import { queryVideoTaskStatus } from "@/lib/video/service";
 
 /**
@@ -22,6 +23,11 @@ export async function GET() {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { user } = authResult;
+
+  await processDueScheduledTasks({
+    userId: user.id,
+    limit: 3,
+  });
 
   const activeTaskGroups = await db
     .select({
