@@ -1,16 +1,9 @@
 import type { NextConfig } from "next";
-import type { Configuration } from "webpack";
 
 const nextConfig: NextConfig = {
-  webpack: (config: Configuration) => {
-    // undici uses node: protocol URIs which webpack cannot handle;
-    // it's server-only and loaded at runtime, so we exclude it from the bundle.
-    config.externals = [
-      ...(Array.isArray(config.externals) ? config.externals : config.externals ? [config.externals] : []),
-      "undici",
-    ];
-    return config;
-  },
+  // Turbopack is the default in Next.js 16; empty config acknowledges this explicitly.
+  // undici is server-only and loaded via require() at runtime — no bundler config needed.
+  turbopack: {},
   // Allow external images from R2 CDN and video providers
   images: {
     remotePatterns: [
