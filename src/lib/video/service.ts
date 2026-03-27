@@ -4,6 +4,7 @@ import { models } from "@/lib/db/schema";
 import type { Model } from "@/lib/db/schema";
 import type { TaskStatusResult, VideoParams } from "./types";
 import { platoProvider } from "./providers/plato";
+import { grokProvider } from "./providers/grok";
 
 export interface VideoProviderCapabilities {
   allowedDurations: Array<8 | 10 | 15>;
@@ -65,6 +66,7 @@ export interface VideoModelOption {
 
 const PROVIDERS: Record<string, VideoProviderAdapter> = {
   plato: platoProvider,
+  grok: grokProvider,
 };
 
 function isDuration(value: unknown): value is 8 | 10 | 15 {
