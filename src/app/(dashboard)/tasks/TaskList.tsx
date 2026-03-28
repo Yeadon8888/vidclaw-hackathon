@@ -11,6 +11,9 @@ import { TaskGroupDownloadButton } from "@/components/tasks/TaskGroupDownloadBut
 const EXPIRY_DAYS = 3;
 const POLL_INTERVAL = 15_000; // 15 seconds
 const ACTIVE_STATUSES = ["pending", "analyzing", "generating", "polling"];
+type TimelineItem =
+  | { kind: "group"; createdAt: string | Date; id: string; group: TaskGroup }
+  | { kind: "task"; createdAt: string | Date; id: string; task: Task };
 
 function formatScheduledAt(value: string | Date | null | undefined): string | null {
   if (!value) return null;
@@ -61,6 +64,18 @@ export function TaskList({
   useEffect(() => {
     taskGroupRef.current = taskGroups;
   }, [taskGroups]);
+
+  const timelineItems: TimelineItem[] = [...taskGroups.map((group) => ({
+    kind: "group" as const,
+    createdAt: group.createdAt,
+    id: group.id,
+    group,
+  })), ...taskList.map((task) => ({
+    kind: "task" as const,
+    createdAt: task.createdAt,
+    id: task.id,
+    task,
+  }))].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Stable refresh function via ref — no dependency on taskList
   useEffect(() => {
@@ -119,10 +134,11 @@ export function TaskList({
         </p>
       </div>
 
-      {taskGroups.length > 0 && (
+      {timelineItems.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-white">批量任务组</h2>
-          {taskGroups.map((group) => {
+          {timelineItems.map((item) => {
+            if (item.kind === "group") {
+              const { group } = item;
             const cfg = statusConfig[group.status] ?? statusConfig.pending;
             const Icon = cfg.icon;
             return (
@@ -171,105 +187,101 @@ export function TaskList({
                 </div>
               </div>
             );
-          })}
-        </div>
-      )}
+            }
 
-      {taskList.length > 0 && (
-        <div className="space-y-3">
-          {taskList.map((task) => {
-        const cfg = statusConfig[task.status] ?? statusConfig.pending;
-        const Icon = cfg.icon;
-        const resultUrls = (task.resultUrls as string[]) ?? [];
-        const params = task.paramsJson as { count?: number } | null;
-        const requestedCount = params?.count ?? 1;
-        const successCount = resultUrls.length;
+            const { task } = item;
+            const cfg = statusConfig[task.status] ?? statusConfig.pending;
+            const Icon = cfg.icon;
+            const resultUrls = (task.resultUrls as string[]) ?? [];
+            const params = task.paramsJson as { count?: number } | null;
+            const requestedCount = params?.count ?? 1;
+            const successCount = resultUrls.length;
 
-        return (
-          <div
-            key={task.id}
-            className="vc-card p-4 transition-all duration-200 hover:shadow-[var(--vc-shadow-md)]"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Icon
-                  className={`h-4 w-4 ${cfg.color} ${
-                    ["analyzing", "generating", "polling"].includes(task.status)
-                      ? "animate-spin"
-                      : ""
-                  }`}
-                />
-                <span className={`text-sm ${cfg.color}`}>
-                  {task.status === "done" && requestedCount > 1
-                    ? `${successCount}/${requestedCount} 完成`
-                    : cfg.label}
-                </span>
-                <span className="rounded-[var(--vc-radius-sm)] bg-[var(--vc-bg-elevated)] px-1.5 py-0.5 text-xs text-[var(--vc-text-muted)]">
-                  {getTaskSourceModeLabel((task.paramsJson as TaskParamsSnapshot | null)?.sourceMode)}
-                </span>
-                {task.creditsCost > 0 && (
-                  <span className="text-xs text-[var(--vc-text-muted)]">
-                    -{task.creditsCost} 积分
+            return (
+              <div
+                key={task.id}
+                className="vc-card p-4 transition-all duration-200 hover:shadow-[var(--vc-shadow-md)]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Icon
+                      className={`h-4 w-4 ${cfg.color} ${
+                        ["analyzing", "generating", "polling"].includes(task.status)
+                          ? "animate-spin"
+                          : ""
+                      }`}
+                    />
+                    <span className={`text-sm ${cfg.color}`}>
+                      {task.status === "done" && requestedCount > 1
+                        ? `${successCount}/${requestedCount} 完成`
+                        : cfg.label}
+                    </span>
+                    <span className="rounded-[var(--vc-radius-sm)] bg-[var(--vc-bg-elevated)] px-1.5 py-0.5 text-xs text-[var(--vc-text-muted)]">
+                      {getTaskSourceModeLabel((task.paramsJson as TaskParamsSnapshot | null)?.sourceMode)}
+                    </span>
+                    {task.creditsCost > 0 && (
+                      <span className="text-xs text-[var(--vc-text-muted)]">
+                        -{task.creditsCost} 积分
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-[var(--vc-text-dim)]">
+                    {new Date(task.createdAt).toLocaleString("zh-CN")}
+                    {task.status === "done" && (() => {
+                      const days = daysUntilExpiry(task.createdAt);
+                      return (
+                        <span className={`ml-2 ${days <= 2 ? "text-red-400" : "text-amber-400/70"}`}>
+                          · {days > 0 ? `${days}天后过期` : "即将清除"}
+                        </span>
+                      );
+                    })()}
                   </span>
+                </div>
+
+                {task.status === "scheduled" && task.scheduledAt && (
+                  <p className="mt-2 text-xs text-purple-300/90">
+                    预计执行：北京时间 {formatScheduledAt(task.scheduledAt)}
+                  </p>
+                )}
+
+                {task.inputText && (
+                  <p className="mt-2 truncate text-sm text-[var(--vc-text-secondary)]">
+                    {task.inputText}
+                  </p>
+                )}
+
+                {task.errorMessage && (
+                  <p className="mt-2 text-xs text-[var(--vc-error)]">{task.errorMessage}</p>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/tasks/${task.id}`}
+                    className="inline-flex items-center rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] px-3 py-1 text-xs text-[var(--vc-text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-white"
+                  >
+                    查看详情
+                  </Link>
+                </div>
+
+                {resultUrls.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {resultUrls.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] px-2 py-1 text-xs text-[var(--vc-text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-white"
+                      >
+                        <Download className="h-3 w-3" />
+                        视频 {i + 1}
+                      </a>
+                    ))}
+                  </div>
                 )}
               </div>
-              <span className="text-xs text-[var(--vc-text-dim)]">
-                {new Date(task.createdAt).toLocaleString("zh-CN")}
-                {task.status === "done" && (() => {
-                  const days = daysUntilExpiry(task.createdAt);
-                  return (
-                    <span className={`ml-2 ${days <= 2 ? "text-red-400" : "text-amber-400/70"}`}>
-                      · {days > 0 ? `${days}天后过期` : "即将清除"}
-                    </span>
-                  );
-                })()}
-              </span>
-            </div>
-
-            {task.status === "scheduled" && task.scheduledAt && (
-              <p className="mt-2 text-xs text-purple-300/90">
-                预计执行：北京时间 {formatScheduledAt(task.scheduledAt)}
-              </p>
-            )}
-
-            {task.inputText && (
-              <p className="mt-2 truncate text-sm text-[var(--vc-text-secondary)]">
-                {task.inputText}
-              </p>
-            )}
-
-            {task.errorMessage && (
-              <p className="mt-2 text-xs text-[var(--vc-error)]">{task.errorMessage}</p>
-            )}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Link
-                href={`/tasks/${task.id}`}
-                className="inline-flex items-center rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] px-3 py-1 text-xs text-[var(--vc-text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-white"
-              >
-                查看详情
-              </Link>
-            </div>
-
-            {resultUrls.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {resultUrls.map((url, i) => (
-                  <a
-                    key={i}
-                    href={url}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] px-2 py-1 text-xs text-[var(--vc-text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-white"
-                  >
-                    <Download className="h-3 w-3" />
-                    视频 {i + 1}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        );
+            );
           })}
         </div>
       )}
