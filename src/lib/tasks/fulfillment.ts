@@ -366,7 +366,13 @@ export async function getActiveProviderTaskIds(
       and(
         eq(taskItems.taskId, taskId),
         eq(taskSlots.status, "submitted"),
-        inArray(taskItems.status, ["PENDING", "PROCESSING", "IN_PROGRESS", "QUEUED"]),
+        inArray(taskItems.status, [
+          "PENDING",
+          "NOT_START",
+          "PROCESSING",
+          "IN_PROGRESS",
+          "QUEUED",
+        ]),
       ),
     );
 
