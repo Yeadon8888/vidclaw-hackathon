@@ -24,12 +24,11 @@ export default function RefundPage() {
       <p>本政策适用于您通过 VidClaw 平台购买的所有积分套餐、订阅服务与增值服务。</p>
 
       <h2>2. 可退款情形</h2>
-      <p>在以下情况下，您有权申请 <strong>全额或部分退款</strong>：</p>
+      <p>出于服务成本与防止滥用的考虑，本服务对积分采取<strong>"已售出不退换"</strong>政策。仅在以下严格情形下，您有权申请退款：</p>
       <ul>
         <li><strong>技术故障导致任务失败</strong>：平台或 AI 模型提供方故障导致您的生成任务失败，且系统未自动退回积分</li>
-        <li><strong>重复扣费</strong>：同一订单被扣款两次或多次</li>
-        <li><strong>未授权交易</strong>：您的支付方式被他人盗用并发生扣费（须在 30 天内报告并提供必要证明）</li>
-        <li><strong>首次购买 24 小时内未使用</strong>：如您首次购买积分后 24 小时内<strong>完全未使用</strong>任何积分（即积分余额等于购买数量），可申请全额退款</li>
+        <li><strong>重复扣费</strong>：同一订单被扣款两次或多次（我们将退回重复支付金额）</li>
+        <li><strong>未授权交易</strong>：您的支付方式被他人盗用并发生扣费（须在 30 天内报告并提供必要证明，例如报案回执）</li>
       </ul>
 
       <h2>3. 不予退款情形</h2>
@@ -58,8 +57,8 @@ export default function RefundPage() {
         <li>审核通过后，退款原路返回您的原支付渠道（信用卡 / 支付宝）</li>
         <li>到账时间：
           <ul>
-            <li>Stripe 信用卡：<strong>5–10 个工作日</strong>（由发卡行决定）</li>
-            <li>支付宝：<strong>1–3 个工作日</strong></li>
+            <li>信用卡 / 借记卡：<strong>5–10 个工作日</strong>（由发卡行决定）</li>
+            <li>支付宝（通过 Stripe）：<strong>1–5 个工作日</strong></li>
           </ul>
         </li>
       </ol>
@@ -101,12 +100,11 @@ export default function RefundPage() {
       <p>This policy covers all credit packs, subscriptions, and add-on services purchased through VidClaw.</p>
 
       <h2>2. Eligible for Refund</h2>
-      <p>You may request a full or partial refund if:</p>
+      <p>Given AI-generation costs and to prevent abuse, credit purchases are <strong>final sale</strong>. Refunds are only granted in the following strict cases:</p>
       <ul>
         <li><strong>Technical failure</strong>: a platform or AI-provider outage caused your generation to fail and credits were not auto-refunded</li>
-        <li><strong>Duplicate charge</strong>: you were charged twice for the same order</li>
-        <li><strong>Unauthorized transaction</strong>: your payment method was used without your authorization (must be reported within 30 days with reasonable evidence)</li>
-        <li><strong>First purchase, unused within 24 hours</strong>: if this is your first purchase and you have consumed zero credits within 24 hours, full refund is available</li>
+        <li><strong>Duplicate charge</strong>: you were charged twice for the same order — we will refund the duplicate</li>
+        <li><strong>Unauthorized transaction</strong>: your payment method was used without your authorization (must be reported within 30 days with reasonable evidence, e.g., police report)</li>
       </ul>
 
       <h2>3. Not Eligible</h2>
@@ -125,7 +123,7 @@ export default function RefundPage() {
         <li>Include: registered email, order ID / Stripe receipt / Alipay txn ID, amount and date, reason and evidence (screenshots)</li>
         <li>We respond within <strong>3 business days</strong></li>
         <li>Approved refunds are returned via the original payment method</li>
-        <li>Arrival time: Stripe cards <strong>5–10 business days</strong>; Alipay <strong>1–3 business days</strong></li>
+        <li>Arrival time: cards <strong>5–10 business days</strong>; Alipay (via Stripe) <strong>1–5 business days</strong></li>
       </ol>
 
       <h2>5. Automatic Credit Reversal</h2>

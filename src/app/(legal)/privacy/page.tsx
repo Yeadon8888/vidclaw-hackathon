@@ -25,7 +25,7 @@ export default function PrivacyPage() {
       <ul>
         <li>账户信息：邮箱、显示名、头像</li>
         <li>内容：您上传的产品图片、参考视频、提示词文案</li>
-        <li>支付信息：通过 Stripe 或支付宝处理，我们<strong>不存储</strong>您的信用卡号或银行卡号；我们仅保存 Stripe 返回的 Customer ID、订单号与开票金额</li>
+        <li>支付信息：所有支付（包括信用卡、借记卡与通过 Stripe 渠道的支付宝）由 Stripe 统一处理。我们<strong>不存储</strong>您的完整卡号或银行账号；我们仅保存 Stripe 返回的 Customer ID、订单号、支付方式末四位（如有）与开票金额</li>
         <li>反馈和沟通记录</li>
       </ul>
       <h3>1.2 自动收集</h3>
@@ -50,8 +50,7 @@ export default function PrivacyPage() {
         <li><strong>Supabase</strong>（数据库 + 身份认证）— 存储账户和业务数据</li>
         <li><strong>Vercel</strong>（托管与 CDN）— 应用部署</li>
         <li><strong>Cloudflare</strong>（CDN、DDoS 防护）</li>
-        <li><strong>Stripe</strong>（国际支付）— 处理信用卡/借记卡支付</li>
-        <li><strong>支付宝</strong>（国内支付）— 处理境内支付</li>
+        <li><strong>Stripe</strong>（支付处理，PCI-DSS Level 1 合规）— 处理信用卡、借记卡以及通过 Stripe 渠道发起的支付宝付款；支付宝付款由蚂蚁集团作为二级处理方共同处理</li>
         <li><strong>AI 模型提供方</strong>（OpenAI / Google / 阿里 / 字节 / 快手等）— 处理您提交的视频生成请求；您的提示词与参考资料将被上传至相应供应商的 API 以生成视频</li>
         <li><strong>Cloudflare R2 / 阿里云 OSS</strong>（对象存储）— 存储生成的视频与资源</li>
       </ul>
@@ -61,7 +60,7 @@ export default function PrivacyPage() {
       <ul>
         <li>我们采用 TLS/HTTPS 加密所有传输链路</li>
         <li>账户密码通过 Supabase 的 bcrypt/Argon2 哈希存储，我们无法查看明文密码</li>
-        <li>支付卡信息由 Stripe / 支付宝直接采集和处理，遵循 PCI-DSS 标准</li>
+        <li>支付卡与支付宝交易信息由 Stripe 直接采集和处理，遵循 PCI-DSS Level 1 标准</li>
         <li>数据主要存储于新加坡/香港区域（Supabase）与全球 CDN 边缘节点（Cloudflare）</li>
       </ul>
 
@@ -113,7 +112,7 @@ export default function PrivacyPage() {
       <ul>
         <li>Account: email, display name, avatar</li>
         <li>Content: product images, reference videos, prompts you upload</li>
-        <li>Payment: processed via Stripe or Alipay. We do <strong>not</strong> store your card numbers; we only retain Stripe customer IDs, order numbers, and billed amounts</li>
+        <li>Payment: all payments (including cards and Alipay-via-Stripe) are processed by Stripe. We do <strong>not</strong> store full card numbers; we only retain Stripe customer IDs, order IDs, last-four digits (where applicable), and billed amounts</li>
         <li>Support communications</li>
       </ul>
       <h3>1.2 Collected Automatically</h3>
@@ -138,8 +137,7 @@ export default function PrivacyPage() {
         <li><strong>Supabase</strong> (database + auth)</li>
         <li><strong>Vercel</strong> (hosting &amp; CDN)</li>
         <li><strong>Cloudflare</strong> (CDN, DDoS protection)</li>
-        <li><strong>Stripe</strong> (international card payments)</li>
-        <li><strong>Alipay</strong> (China-domestic payments)</li>
+        <li><strong>Stripe</strong> (payment processing, PCI-DSS Level 1) — processes cards and Alipay payments initiated through Stripe; Alipay charges involve Ant Group as a sub-processor</li>
         <li><strong>AI model providers</strong> (OpenAI, Google, Alibaba, ByteDance, Kuaishou, etc.) — your prompts and reference materials are sent to the selected provider's API to produce output</li>
         <li><strong>Cloudflare R2 / Alibaba OSS</strong> (object storage for generated videos)</li>
       </ul>
@@ -149,7 +147,7 @@ export default function PrivacyPage() {
       <ul>
         <li>All connections use TLS/HTTPS</li>
         <li>Passwords are hashed (bcrypt/Argon2) via Supabase Auth</li>
-        <li>Card data is handled directly by Stripe/Alipay under PCI-DSS</li>
+        <li>Card and Alipay data are handled directly by Stripe under PCI-DSS Level 1</li>
       </ul>
 
       <h2>5. Data Retention</h2>

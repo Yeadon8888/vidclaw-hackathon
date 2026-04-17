@@ -64,7 +64,7 @@ export default function TermsPage() {
       <h2>5. 订阅与计费</h2>
       <ul>
         <li>本服务采用<strong>积分预充值</strong>模式。不同 AI 模型消耗不同积分数</li>
-        <li>支付通过 Stripe（国际）或支付宝（国内）处理，金额以下单页展示的为准</li>
+        <li>支付通过 Stripe 统一处理（支持信用卡/借记卡，以及通过 Stripe 渠道的支付宝），金额以下单页展示的为准</li>
         <li>积分<strong>一旦购买不可退换</strong>（但可申请退款，参见 <a href="/refund">退款政策</a>）</li>
         <li>积分在购买后一般 <strong>180 天内有效</strong>，到期未使用的部分自动作废</li>
         <li>部分套餐可能为订阅制，自动续费规则会在结算页明确告知</li>
@@ -154,7 +154,7 @@ export default function TermsPage() {
       <h2>5. Subscription &amp; Billing</h2>
       <ul>
         <li>The service uses a <strong>prepaid credits</strong> model; different AI models consume different credit amounts</li>
-        <li>Payments are processed via Stripe (international) or Alipay (China)</li>
+        <li>Payments are processed by Stripe (cards and Alipay-via-Stripe)</li>
         <li>Credits are <strong>non-transferable and generally non-refundable</strong> once consumed; see <a href="/refund">Refund Policy</a> for exceptions</li>
         <li>Credits typically expire after <strong>180 days</strong></li>
         <li>Subscription auto-renewal, where applicable, is disclosed at checkout</li>
