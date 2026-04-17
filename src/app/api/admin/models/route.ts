@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { models } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { normalizeModelDefaultParams } from "@/lib/video/service";
+import {
+  isModelCapability,
+  MODEL_CAPABILITIES,
+} from "@/lib/models/capabilities";
 
 /** GET /api/admin/models — list all video models (admin only) */
 export async function GET() {
@@ -27,6 +31,7 @@ export async function POST(req: NextRequest) {
     name: string;
     slug: string;
     provider: string;
+    capability?: string;
     creditsPerGen?: number;
     isActive?: boolean;
     apiKey?: string;
@@ -42,12 +47,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (body.capability !== undefined && !isModelCapability(body.capability)) {
+    return NextResponse.json({ error: "capability 无效" }, { status: 400 });
+  }
+
   const [created] = await db
     .insert(models)
     .values({
       name: body.name,
       slug: body.slug,
       provider: body.provider,
+      capability: body.capability ?? MODEL_CAPABILITIES.videoGeneration,
       creditsPerGen: body.creditsPerGen ?? 10,
       isActive: body.isActive ?? true,
       apiKey: body.apiKey || null,
@@ -70,6 +80,7 @@ export async function PATCH(req: NextRequest) {
     name?: string;
     slug?: string;
     provider?: string;
+    capability?: string;
     creditsPerGen?: number;
     isActive?: boolean;
     apiKey?: string | null;
@@ -82,10 +93,15 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
+  if (body.capability !== undefined && !isModelCapability(body.capability)) {
+    return NextResponse.json({ error: "capability 无效" }, { status: 400 });
+  }
+
   const updates: Record<string, unknown> = {};
   if (body.name !== undefined) updates.name = body.name;
   if (body.slug !== undefined) updates.slug = body.slug;
   if (body.provider !== undefined) updates.provider = body.provider;
+  if (body.capability !== undefined) updates.capability = body.capability;
   if (body.creditsPerGen !== undefined) updates.creditsPerGen = body.creditsPerGen;
   if (body.isActive !== undefined) updates.isActive = body.isActive;
   if (body.apiKey !== undefined) updates.apiKey = body.apiKey || null;

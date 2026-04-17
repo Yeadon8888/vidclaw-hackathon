@@ -7,14 +7,21 @@ import {
   buildDefaultParamsPreview,
   defaultParamsToEditorState,
   editorStateToDefaultParams,
+  getModelDurationOptions,
   type ModelDefaultParamsEditorState,
 } from "@/lib/video/model-default-params-form";
+import {
+  getModelCapabilityLabel,
+  MODEL_CAPABILITIES,
+  type ModelCapability,
+} from "@/lib/models/capabilities";
 
 interface Model {
   id: string;
   name: string;
   slug: string;
   provider: string;
+  capability: ModelCapability;
   creditsPerGen: number;
   isActive: boolean;
   apiKey: string | null;
@@ -27,6 +34,7 @@ interface ModelFormState {
   name: string;
   slug: string;
   provider: string;
+  capability: ModelCapability;
   creditsPerGen: string;
   isActive: boolean;
   apiKey: string;
@@ -38,7 +46,8 @@ interface ModelFormState {
 const EMPTY_FORM: ModelFormState = {
   name: "",
   slug: "",
-  provider: "plato",
+  provider: "",
+  capability: MODEL_CAPABILITIES.videoGeneration,
   creditsPerGen: "10",
   isActive: true,
   apiKey: "",
@@ -48,11 +57,13 @@ const EMPTY_FORM: ModelFormState = {
     orientation: "",
     duration: "10",
     count: "",
-    allowedDurations: ["10", "15"],
+    allowedDurations: ["4", "10", "15"],
     watermark: "inherit",
     extraParamsText: "{}",
   },
 };
+
+const MODEL_DURATION_OPTIONS = getModelDurationOptions();
 
 function parseForm(form: ModelFormState): {
   ok: true;
@@ -60,6 +71,7 @@ function parseForm(form: ModelFormState): {
     name: string;
     slug: string;
     provider: string;
+    capability: ModelCapability;
     creditsPerGen: number;
     isActive: boolean;
     apiKey: string | null;
@@ -78,9 +90,13 @@ function parseForm(form: ModelFormState): {
     return { ok: false, error: "排序值不合法" };
   }
 
-  const defaultParamsResult = editorStateToDefaultParams(form.paramsEditor);
-  if (!defaultParamsResult.ok) {
-    return defaultParamsResult;
+  let defaultParams: Record<string, unknown> = {};
+  if (form.capability === MODEL_CAPABILITIES.videoGeneration) {
+    const defaultParamsResult = editorStateToDefaultParams(form.paramsEditor);
+    if (!defaultParamsResult.ok) {
+      return defaultParamsResult;
+    }
+    defaultParams = defaultParamsResult.payload;
   }
 
   if (!form.name.trim() || !form.slug.trim() || !form.provider.trim()) {
@@ -93,15 +109,18 @@ function parseForm(form: ModelFormState): {
       name: form.name.trim(),
       slug: form.slug.trim(),
       provider: form.provider.trim(),
+      capability: form.capability,
       creditsPerGen,
       isActive: form.isActive,
       apiKey: form.apiKey.trim() || null,
       baseUrl: form.baseUrl.trim() || null,
       sortOrder,
-      defaultParams: defaultParamsResult.payload,
+      defaultParams,
     },
   };
 }
+
+type DurationToken = ModelDefaultParamsEditorState["allowedDurations"][number];
 
 export default function AdminModelsPage() {
   const [modelList, setModels] = useState<Model[]>([]);
@@ -138,13 +157,13 @@ export default function AdminModelsPage() {
     }));
   }
 
-  function toggleAllowedDuration(value: "8" | "10" | "15") {
+  function toggleAllowedDuration(value: DurationToken) {
     setForm((current) => {
       const allowedDurations = current.paramsEditor.allowedDurations.includes(value)
         ? current.paramsEditor.allowedDurations.filter((item) => item !== value)
         : [...current.paramsEditor.allowedDurations, value].sort(
             (left, right) => Number(left) - Number(right),
-          ) as Array<"8" | "10" | "15">;
+          ) as DurationToken[];
 
       return {
         ...current,
@@ -164,6 +183,7 @@ export default function AdminModelsPage() {
       name: model.name,
       slug: model.slug,
       provider: model.provider,
+      capability: model.capability,
       creditsPerGen: String(model.creditsPerGen),
       isActive: model.isActive,
       apiKey: model.apiKey ?? "",
@@ -277,6 +297,7 @@ export default function AdminModelsPage() {
               <th className="px-4 py-3 text-left">名称</th>
               <th className="px-4 py-3 text-left">Slug</th>
               <th className="px-4 py-3 text-left">Provider</th>
+              <th className="px-4 py-3 text-left">能力</th>
               <th className="px-4 py-3 text-right">积分/次</th>
               <th className="px-4 py-3 text-right">排序</th>
               <th className="px-4 py-3 text-left">Base URL</th>
@@ -288,13 +309,13 @@ export default function AdminModelsPage() {
           <tbody className="divide-y divide-[var(--vc-border)]">
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-[var(--vc-text-muted)]">
+                <td colSpan={10} className="px-4 py-8 text-center text-[var(--vc-text-muted)]">
                   加载中...
                 </td>
               </tr>
             ) : modelList.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-[var(--vc-text-muted)]">
+                <td colSpan={10} className="px-4 py-8 text-center text-[var(--vc-text-muted)]">
                   暂无模型配置，请添加
                 </td>
               </tr>
@@ -304,6 +325,9 @@ export default function AdminModelsPage() {
                   <td className="px-4 py-3 text-white">{model.name}</td>
                   <td className="px-4 py-3 font-mono text-zinc-300">{model.slug}</td>
                   <td className="px-4 py-3 text-zinc-300">{model.provider}</td>
+                  <td className="px-4 py-3 text-zinc-300">
+                    {getModelCapabilityLabel(model.capability)}
+                  </td>
                   <td className="px-4 py-3 text-right font-mono text-white">
                     {model.creditsPerGen}
                   </td>
@@ -416,6 +440,20 @@ export default function AdminModelsPage() {
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-zinc-400">能力</label>
+                <select
+                  value={form.capability}
+                  onChange={(event) =>
+                    updateForm("capability", event.target.value as ModelCapability)
+                  }
+                  className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--vc-accent)]"
+                >
+                  <option value={MODEL_CAPABILITIES.videoGeneration}>视频生成</option>
+                  <option value={MODEL_CAPABILITIES.imageEdit}>图片编辑</option>
+                  <option value={MODEL_CAPABILITIES.scriptGeneration}>脚本分析</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-zinc-400">积分/次</label>
                 <input
                   type="number"
@@ -436,6 +474,21 @@ export default function AdminModelsPage() {
                 <p className="mt-2 text-xs text-zinc-500">
                   这里填服务根地址，例如 `https://api.bltcy.ai`，不要填完整接口路径
                 </p>
+                {form.capability === MODEL_CAPABILITIES.videoGeneration && (
+                  <p className="mt-1 text-xs text-zinc-500">
+                    例如 `plato` 可填 `https://api.bltcy.ai`，`yunwu` 可填 `https://yunwu.ai`。
+                  </p>
+                )}
+                {form.capability === MODEL_CAPABILITIES.imageEdit && (
+                  <p className="mt-1 text-xs text-zinc-500">
+                    图片编辑模型默认会请求 `/v1/chat/completions`。
+                  </p>
+                )}
+                {form.capability === MODEL_CAPABILITIES.scriptGeneration && (
+                  <p className="mt-1 text-xs text-zinc-500">
+                    脚本分析模型默认会请求 `/v1beta/models/&lt;model&gt;:generateContent`。
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-zinc-400">API Key</label>
@@ -466,6 +519,8 @@ export default function AdminModelsPage() {
               </label>
               </div>
 
+              {form.capability === MODEL_CAPABILITIES.videoGeneration ? (
+              <>
               <div className="mt-4">
                 <label className="block text-xs font-medium text-zinc-400">
                   常用参数
@@ -499,9 +554,11 @@ export default function AdminModelsPage() {
                     className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--vc-accent)]"
                   >
                     <option value="">不设置</option>
-                    <option value="8">8 秒</option>
-                    <option value="10">10 秒</option>
-                    <option value="15">15 秒</option>
+                    {MODEL_DURATION_OPTIONS.map((duration) => (
+                      <option key={duration} value={duration}>
+                        {duration} 秒
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -537,7 +594,7 @@ export default function AdminModelsPage() {
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-zinc-400">允许时长</label>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {(["8", "10", "15"] as const).map((duration) => {
+                    {MODEL_DURATION_OPTIONS.map((duration) => {
                       const active = form.paramsEditor.allowedDurations.includes(duration);
                       return (
                         <button
@@ -587,6 +644,14 @@ export default function AdminModelsPage() {
                   className="mt-1 w-full rounded-lg border border-[var(--vc-border)] bg-[var(--vc-bg-root)]/70 px-3 py-2 font-mono text-sm text-zinc-300 outline-none"
                 />
               </div>
+              </>
+              ) : (
+              <div className="mt-4 rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-4 py-3 text-sm text-zinc-400">
+                {form.capability === MODEL_CAPABILITIES.imageEdit
+                  ? "图片编辑模型当前不使用视频默认参数，只读取 slug / Base URL / API Key / 积分配置。"
+                  : "脚本分析模型当前不使用视频默认参数，只读取 slug / Base URL / API Key。未配置时会回退到环境变量。"}
+              </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 border-t border-[var(--vc-border)] px-5 py-4">

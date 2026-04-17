@@ -6,7 +6,8 @@ const COMMON_KEYS = new Set([
   "watermark",
 ]);
 
-type DurationOption = "8" | "10" | "15";
+const DURATION_OPTIONS = ["4", "6", "8", "10", "15"] as const;
+type DurationOption = (typeof DURATION_OPTIONS)[number];
 type OrientationOption = "" | "portrait" | "landscape";
 type WatermarkOption = "inherit" | "true" | "false";
 
@@ -24,6 +25,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeDurationOption(value: unknown): DurationOption | "" {
+  if (value === 4 || value === "4") return "4";
+  if (value === 6 || value === "6") return "6";
   if (value === 8 || value === "8") return "8";
   if (value === 10 || value === "10") return "10";
   if (value === 15 || value === "15") return "15";
@@ -171,4 +174,8 @@ export function buildDefaultParamsPreview(
   const result = editorStateToDefaultParams(state);
   if (!result.ok) return "";
   return formatJson(result.payload);
+}
+
+export function getModelDurationOptions(): readonly DurationOption[] {
+  return DURATION_OPTIONS;
 }
