@@ -227,19 +227,31 @@ export async function listActiveVideoModels(): Promise<VideoModelOption[]> {
     )
     .orderBy(asc(models.sortOrder));
 
-  return rows.map((row) => {
+  const options: VideoModelOption[] = [];
+  for (const row of rows) {
     const model = mapModelRow(row);
-    const capabilities = getProviderCapabilities(model);
-    return {
-      slug: model.slug,
-      name: model.name,
-      provider: model.provider,
-      creditsPerGen: model.creditsPerGen,
-      defaultParams: model.defaultParams ?? {},
-      allowedDurations: capabilities.allowedDurations,
-      defaultDuration: capabilities.defaultDuration,
-    };
-  });
+    try {
+      const capabilities = getProviderCapabilities(model);
+      options.push({
+        slug: model.slug,
+        name: model.name,
+        provider: model.provider,
+        creditsPerGen: model.creditsPerGen,
+        defaultParams: model.defaultParams ?? {},
+        allowedDurations: capabilities.allowedDurations,
+        defaultDuration: capabilities.defaultDuration,
+      });
+    } catch (err) {
+      // Skip models whose provider adapter is no longer registered.
+      // A stale DB row (e.g. a grok model row left after the provider
+      // was removed) should not take the whole catalog offline.
+      console.warn(
+        `[video] skipping model ${model.slug} (${model.provider}):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+  return options;
 }
 
 export async function getVideoModelById(
