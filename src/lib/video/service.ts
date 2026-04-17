@@ -7,6 +7,7 @@ import type { TaskStatusResult, VideoDuration, VideoParams } from "./types";
 import { platoProvider } from "./providers/plato";
 import { yunwuProvider } from "./providers/yunwu";
 import { dashscopeProvider } from "./providers/dashscope";
+import { grok2apiProvider } from "./providers/grok2api";
 import { prepareImagesForProvider } from "./image-prep";
 
 export interface VideoProviderCapabilities {
@@ -72,6 +73,7 @@ const PROVIDERS: Record<string, VideoProviderAdapter> = {
   plato: platoProvider,
   yunwu: yunwuProvider,
   dashscope: dashscopeProvider,
+  grok2api: grok2apiProvider,
 };
 
 function isDuration(value: unknown): value is VideoDuration {
