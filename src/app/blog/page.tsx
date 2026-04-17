@@ -4,9 +4,24 @@ import { posts } from "@/lib/blog";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Blog",
+  title: "博客 — AI 视频生成教程与带货内容运营",
   description:
-    "Learn about AI video generation, e-commerce content strategies, and product video creation tips. Articles in English and Chinese.",
+    "AI 视频生成、抖音/TikTok 二创、电商短视频运营的系列教程与深度文章。涵盖 Sora、VEO 3.1、海螺等模型的使用技巧与实战案例。",
+  alternates: {
+    canonical: "/blog",
+    languages: {
+      "zh-CN": "/blog",
+      "en-US": "/en/blog",
+    },
+  },
+  openGraph: {
+    type: "website",
+    title: "VidClaw 博客 — AI 视频生成教程与带货内容运营",
+    description:
+      "AI 视频生成、抖音/TikTok 二创、电商短视频运营的系列教程与实战文章。",
+    url: "https://video.yeadon.top/blog",
+    locale: "zh_CN",
+  },
 };
 
 export default function BlogPage() {

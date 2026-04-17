@@ -19,16 +19,26 @@ export async function generateMetadata({
   const post = getPostBySlug(slug);
   if (!post) return {};
 
+  const url = `${SITE_URL}/blog/${post.slug}`;
   return {
     title: post.title,
     description: post.description,
+    alternates: {
+      canonical: url,
+    },
     openGraph: {
       type: "article",
       title: post.title,
       description: post.description,
-      url: `${SITE_URL}/blog/${post.slug}`,
+      url,
       publishedTime: post.date,
       tags: post.tags,
+      locale: post.lang === "zh" ? "zh_CN" : "en_US",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.description,
     },
   };
 }
@@ -42,19 +52,36 @@ export default async function BlogPostPage({
   const post = getPostBySlug(slug);
   if (!post) notFound();
 
+  const url = `${SITE_URL}/blog/${post.slug}`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
     description: post.description,
     datePublished: post.date,
-    url: `${SITE_URL}/blog/${post.slug}`,
-    publisher: {
+    dateModified: post.date,
+    url,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": url,
+    },
+    author: {
       "@type": "Organization",
       name: "VidClaw",
       url: SITE_URL,
     },
-    inLanguage: post.lang === "zh" ? "zh-CN" : "en",
+    publisher: {
+      "@type": "Organization",
+      name: "VidClaw",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/favicon.svg`,
+      },
+    },
+    image: `${SITE_URL}/opengraph-image`,
+    keywords: post.tags.join(", "),
+    inLanguage: post.lang === "zh" ? "zh-CN" : "en-US",
   };
 
   return (
