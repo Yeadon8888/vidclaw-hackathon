@@ -70,131 +70,151 @@ export async function processPendingBatchTasks(params: {
     .orderBy(asc(tasks.createdAt))
     .limit(limit);
 
+  // Process sub-tasks within this group concurrently. Previously this was a
+  // serial for-loop with `await delayStaggeredSubmission(submissionIndex++)`
+  // between each, which meant a tick could only push 1-2 sub-tasks through
+  // before hitting the 300s Vercel ceiling (each sub-task blocks 60-90s on
+  // grok2api's synchronous create per slot). The stagger is preserved by
+  // offsetting each sub-task's *start time* by `index * STAGGER_MS` so we
+  // still spread submissions out, but a slow sub-task no longer blocks the
+  // next one from even starting. Provider-level rate limiting is already
+  // enforced inside submitPendingSlots + the proxy's own account pool, so
+  // bursting here does not overrun Grok — it just removes our artificial
+  // head-of-line blocking.
+  const results = await Promise.allSettled(
+    queuedTasks.map(async (queuedTask, index) => {
+      await delayStaggeredSubmission(index);
+
+      // Claim the row atomically. Two concurrent tick runs racing on the
+      // same pending row will both arrive here, but the WHERE status=pending
+      // guard means only one update actually claims it.
+      const [claimedTask] = await db
+        .update(tasks)
+        .set({ status: "analyzing", errorMessage: null, startedAt: new Date() })
+        .where(and(eq(tasks.id, queuedTask.id), eq(tasks.status, "pending")))
+        .returning();
+
+      if (!claimedTask) return "skipped" as const;
+
+      try {
+        const taskParams = (claimedTask.paramsJson ?? {}) as TaskParamsSnapshot;
+        const imageUrl = taskParams.imageUrls?.[0];
+        if (!imageUrl) {
+          throw new Error("批量任务缺少产品图 URL。");
+        }
+
+        const imageAsset = await fetchAssetBuffer(imageUrl);
+        const scriptResult = await generateScript({
+          type: "theme",
+          theme: taskParams.batchTheme ?? claimedTask.inputText ?? "",
+          imageBuffers: [imageAsset],
+          promptTemplate: customPrompts.theme_to_video,
+          platform: taskParams.platform,
+          outputLanguage: taskParams.outputLanguage,
+        });
+
+        if (customPrompts.copy_generation) {
+          try {
+            scriptResult.copy = await generateCopy(
+              scriptResult.full_sora_prompt,
+              customPrompts.copy_generation,
+              taskParams.platform,
+              taskParams.outputLanguage,
+            );
+          } catch {
+            // Fall back to the original Gemini copy if custom regeneration fails.
+          }
+        }
+
+        const soraPrompt = buildFinalVideoPrompt({
+          scriptPrompt: scriptResult.full_sora_prompt,
+          referenceImageCount: 1,
+          outputLanguage: taskParams.outputLanguage,
+        });
+
+        await db
+          .update(tasks)
+          .set({
+            status: "generating",
+            soraPrompt,
+            scriptJson: scriptResult,
+          })
+          .where(eq(tasks.id, claimedTask.id));
+
+        if (claimedTask.fulfillmentMode === "backfill_until_target") {
+          await initializeSlots(claimedTask.id, resolveBatchTaskVideoCount(taskParams));
+          const activeSlots = await db
+            .select({ id: taskSlots.id })
+            .from(taskSlots)
+            .where(
+              and(
+                eq(taskSlots.taskId, claimedTask.id),
+                eq(taskSlots.status, "submitted"),
+              ),
+            );
+          const slotSubmissionLimit = resolveRemainingSubmissionCapacity({
+            activeCount: activeSlots.length,
+            maxConcurrent: getMaxBatchSlotSubmissionsPerTick(),
+            requestedCount: resolveBatchTaskVideoCount(taskParams),
+          });
+          const providerTaskIds = await submitPendingSlots({
+            id: claimedTask.id,
+            userId: claimedTask.userId,
+            modelId: claimedTask.modelId,
+            soraPrompt,
+            paramsJson: claimedTask.paramsJson,
+          }, { limit: slotSubmissionLimit });
+
+          if (providerTaskIds.length === 0) {
+            throw new Error("批量任务提交失败，未成功创建任何 provider 子任务。");
+          }
+        } else {
+          const submitted = await createVideoTasksForModelId({
+            modelId: claimedTask.modelId,
+            request: {
+              prompt: soraPrompt,
+              imageUrls: [imageUrl],
+              orientation: taskParams.orientation,
+              duration: taskParams.duration,
+              count: resolveBatchTaskVideoCount(taskParams),
+              model: taskParams.model,
+            },
+            userId: claimedTask.userId,
+          });
+
+          await insertTaskItemsFromSubmission({
+            taskId: claimedTask.id,
+            providerTaskIds: submitted.providerTaskIds,
+            immediateResults: submitted.immediateResults,
+          });
+        }
+
+        return "processed" as const;
+      } catch (error) {
+        await failTaskAndRefund({
+          taskId: claimedTask.id,
+          userId: claimedTask.userId,
+          refundAmount: claimedTask.creditsCost,
+          errorMessage: String(error).slice(0, 500),
+          refundReason: "批量任务处理失败自动退款",
+          allowedStatuses: ["pending", "analyzing", "generating", "polling"],
+        });
+        return "failed" as const;
+      }
+    }),
+  );
+
   let processed = 0;
   let failed = 0;
-
-  let submissionIndex = 0;
-
-  for (const queuedTask of queuedTasks) {
-    // Stamp `started_at` at claim-time so resetStaleAnalyzingTasks can
-    // measure "stuck in analyzing" against actual claim time, not against
-    // task creation (which would falsely qualify queued-for-a-while tasks
-    // the moment they're claimed).
-    const [claimedTask] = await db
-      .update(tasks)
-      .set({ status: "analyzing", errorMessage: null, startedAt: new Date() })
-      .where(and(eq(tasks.id, queuedTask.id), eq(tasks.status, "pending")))
-      .returning();
-
-    if (!claimedTask) continue;
-
-    try {
-      await delayStaggeredSubmission(submissionIndex);
-      submissionIndex += 1;
-
-      const taskParams = (claimedTask.paramsJson ?? {}) as TaskParamsSnapshot;
-      const imageUrl = taskParams.imageUrls?.[0];
-      if (!imageUrl) {
-        throw new Error("批量任务缺少产品图 URL。");
-      }
-
-      const imageAsset = await fetchAssetBuffer(imageUrl);
-      const scriptResult = await generateScript({
-        type: "theme",
-        theme: taskParams.batchTheme ?? claimedTask.inputText ?? "",
-        imageBuffers: [imageAsset],
-        promptTemplate: customPrompts.theme_to_video,
-        platform: taskParams.platform,
-        outputLanguage: taskParams.outputLanguage,
-      });
-
-      if (customPrompts.copy_generation) {
-        try {
-          scriptResult.copy = await generateCopy(
-          scriptResult.full_sora_prompt,
-          customPrompts.copy_generation,
-          taskParams.platform,
-          taskParams.outputLanguage,
-        );
-        } catch {
-          // Fall back to the original Gemini copy if custom regeneration fails.
-        }
-      }
-
-      const soraPrompt = buildFinalVideoPrompt({
-        scriptPrompt: scriptResult.full_sora_prompt,
-        referenceImageCount: 1,
-        outputLanguage: taskParams.outputLanguage,
-      });
-
-      await db
-        .update(tasks)
-        .set({
-          status: "generating",
-          soraPrompt,
-          scriptJson: scriptResult,
-        })
-        .where(eq(tasks.id, claimedTask.id));
-
-      if (claimedTask.fulfillmentMode === "backfill_until_target") {
-        await initializeSlots(claimedTask.id, resolveBatchTaskVideoCount(taskParams));
-        const activeSlots = await db
-          .select({ id: taskSlots.id })
-          .from(taskSlots)
-          .where(
-            and(
-              eq(taskSlots.taskId, claimedTask.id),
-              eq(taskSlots.status, "submitted"),
-            ),
-          );
-        const slotSubmissionLimit = resolveRemainingSubmissionCapacity({
-          activeCount: activeSlots.length,
-          maxConcurrent: getMaxBatchSlotSubmissionsPerTick(),
-          requestedCount: resolveBatchTaskVideoCount(taskParams),
-        });
-        const providerTaskIds = await submitPendingSlots({
-          id: claimedTask.id,
-          userId: claimedTask.userId,
-          modelId: claimedTask.modelId,
-          soraPrompt,
-          paramsJson: claimedTask.paramsJson,
-        }, { limit: slotSubmissionLimit });
-
-        if (providerTaskIds.length === 0) {
-          throw new Error("批量任务提交失败，未成功创建任何 provider 子任务。");
-        }
-      } else {
-        const submitted = await createVideoTasksForModelId({
-          modelId: claimedTask.modelId,
-          request: {
-            prompt: soraPrompt,
-            imageUrls: [imageUrl],
-            orientation: taskParams.orientation,
-            duration: taskParams.duration,
-            count: resolveBatchTaskVideoCount(taskParams),
-            model: taskParams.model,
-          },
-          userId: claimedTask.userId,
-        });
-
-        await insertTaskItemsFromSubmission({
-          taskId: claimedTask.id,
-          providerTaskIds: submitted.providerTaskIds,
-          immediateResults: submitted.immediateResults,
-        });
-      }
-
-      processed += 1;
-    } catch (error) {
-        failed += 1;
-      await failTaskAndRefund({
-        taskId: claimedTask.id,
-        userId: claimedTask.userId,
-        refundAmount: claimedTask.creditsCost,
-        errorMessage: String(error).slice(0, 500),
-        refundReason: "批量任务处理失败自动退款",
-        allowedStatuses: ["pending", "analyzing", "generating", "polling"],
-      });
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      if (result.value === "processed") processed += 1;
+      else if (result.value === "failed") failed += 1;
+    } else {
+      // Unexpected throw outside the inner try/catch (e.g. claim-step DB
+      // error). Count as failed so metrics stay honest.
+      failed += 1;
+      console.error("[batch-processing] sub-task rejected:", result.reason);
     }
   }
 
