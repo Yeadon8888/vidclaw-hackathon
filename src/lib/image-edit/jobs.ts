@@ -181,106 +181,134 @@ export async function submitAssetTransformJobs(params: {
   };
 }
 
+// Leave a safety buffer under Vercel's 300s maxDuration so the function
+// returns cleanly instead of being killed mid-transaction.
+const DRAIN_BUDGET_MS = 260_000;
+
 export async function processPendingAssetTransformJobs(params?: {
   userId?: string;
   limit?: number;
 }) {
   await resetStaleAssetTransformJobs(params?.userId);
 
-  const [activeProcessingRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(assetTransformJobs)
-    .where(
-      params?.userId
-        ? and(
-            eq(assetTransformJobs.userId, params.userId),
-            eq(assetTransformJobs.status, "processing"),
-          )
-        : eq(assetTransformJobs.status, "processing"),
-    );
-
-  const limit = resolveAssetTransformAvailableSlots({
-    processingCount: activeProcessingRow?.count ?? 0,
-    requestedCount: params?.limit ?? DEFAULT_ASSET_TRANSFORM_LIMIT,
-  });
-
-  if (limit <= 0) {
-    return { processed: 0, failed: 0, requeued: 0 };
-  }
-
-  const whereClause = params?.userId
-    ? and(
-        eq(assetTransformJobs.userId, params.userId),
-        eq(assetTransformJobs.status, "pending"),
-      )
-    : eq(assetTransformJobs.status, "pending");
-
-  const queuedJobs = await db
-    .select()
-    .from(assetTransformJobs)
-    .where(whereClause)
-    .orderBy(desc(assetTransformJobs.createdAt))
-    .limit(limit);
-
   let processed = 0;
   let failed = 0;
   let requeued = 0;
+  const startedAt = Date.now();
 
-  await Promise.all(
-    queuedJobs.map(async (queuedJob) => {
-    const [claimedJob] = await db
-      .update(assetTransformJobs)
-      .set({
-        status: "processing",
-        errorMessage: null,
-        startedAt: new Date(),
-        updatedAt: new Date(),
-      })
+  // Drain loop: keep picking up batches of up-to-3 until the queue is empty,
+  // capacity is full from concurrent workers, or we're running out of runtime.
+  // Without this loop, a client-side batch of N > MAX_CONCURRENT leaves the
+  // tail of pendings stranded because nothing re-triggers the worker once the
+  // initial round of Promise.all completes.
+  while (Date.now() - startedAt < DRAIN_BUDGET_MS) {
+    const [activeProcessingRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(assetTransformJobs)
       .where(
-        and(
-          eq(assetTransformJobs.id, queuedJob.id),
+        params?.userId
+          ? and(
+              eq(assetTransformJobs.userId, params.userId),
+              eq(assetTransformJobs.status, "processing"),
+            )
+          : eq(assetTransformJobs.status, "processing"),
+      );
+
+    const batchLimit = resolveAssetTransformAvailableSlots({
+      processingCount: activeProcessingRow?.count ?? 0,
+      requestedCount: params?.limit ?? DEFAULT_ASSET_TRANSFORM_LIMIT,
+    });
+
+    if (batchLimit <= 0) break;
+
+    const whereClause = params?.userId
+      ? and(
+          eq(assetTransformJobs.userId, params.userId),
           eq(assetTransformJobs.status, "pending"),
-        ),
-      )
-      .returning();
+        )
+      : eq(assetTransformJobs.status, "pending");
 
-      if (!claimedJob) return;
+    const queuedJobs = await db
+      .select()
+      .from(assetTransformJobs)
+      .where(whereClause)
+      .orderBy(desc(assetTransformJobs.createdAt))
+      .limit(batchLimit);
 
-      try {
-        await runAssetTransformJob(claimedJob);
-        processed += 1;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message.slice(0, 500) : "图片转换失败";
+    if (queuedJobs.length === 0) break;
 
-        if (isRetryableAssetTransformError(error)) {
-          requeued += 1;
+    const roundResults = await Promise.all(
+      queuedJobs.map(async (queuedJob) => {
+        const [claimedJob] = await db
+          .update(assetTransformJobs)
+          .set({
+            status: "processing",
+            errorMessage: null,
+            startedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(assetTransformJobs.id, queuedJob.id),
+              eq(assetTransformJobs.status, "pending"),
+            ),
+          )
+          .returning();
+
+        if (!claimedJob) return "skipped" as const;
+
+        try {
+          await runAssetTransformJob(claimedJob);
+          return "processed" as const;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message.slice(0, 500) : "图片转换失败";
+
+          if (isRetryableAssetTransformError(error)) {
+            await db
+              .update(assetTransformJobs)
+              .set({
+                status: "pending",
+                errorMessage: `图片处理耗时过长，已自动重试。上次错误：${message}`.slice(0, 500),
+                updatedAt: new Date(),
+                startedAt: null,
+                completedAt: null,
+              })
+              .where(eq(assetTransformJobs.id, claimedJob.id));
+            return "requeued" as const;
+          }
+
           await db
             .update(assetTransformJobs)
             .set({
-              status: "pending",
-              errorMessage: `图片处理耗时过长，已自动重试。上次错误：${message}`.slice(0, 500),
+              status: "failed",
+              errorMessage: message,
+              completedAt: new Date(),
               updatedAt: new Date(),
-              startedAt: null,
-              completedAt: null,
             })
             .where(eq(assetTransformJobs.id, claimedJob.id));
-          return;
+          return "failed" as const;
         }
+      }),
+    );
 
+    let roundActivity = 0;
+    for (const r of roundResults) {
+      if (r === "processed") {
+        processed += 1;
+        roundActivity += 1;
+      } else if (r === "failed") {
         failed += 1;
-        await db
-          .update(assetTransformJobs)
-          .set({
-            status: "failed",
-            errorMessage: message,
-            completedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(assetTransformJobs.id, claimedJob.id));
+        roundActivity += 1;
+      } else if (r === "requeued") {
+        requeued += 1;
       }
-    }),
-  );
+    }
+
+    // If every returned row was already claimed by a concurrent worker, bail
+    // so we don't spin on an empty queue.
+    if (roundActivity === 0 && requeued === 0) break;
+  }
 
   return { processed, failed, requeued };
 }

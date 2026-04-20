@@ -29,26 +29,35 @@ async function main() {
   }
 
   const tickUrl = "https://video.yeadon.top/api/internal/tasks/tick";
+  const thumbBackfillUrl = "https://video.yeadon.top/api/internal/gallery/thumbnail-backfill";
+  const assetTransformUrl = "https://video.yeadon.top/api/internal/assets/transforms/process";
   const sql = postgres(databaseUrl, { ssl: "require", prepare: false });
-  const escapedTickUrl = tickUrl.replace(/'/g, "''");
   const escapedCronSecret = cronSecret.replace(/'/g, "''");
-  const tickCommand = `
-    select
-      net.http_post(
-        url := '${escapedTickUrl}',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ${escapedCronSecret}'
-        ),
-        body := '{}'::jsonb
-      );
-  `.trim();
+
+  function buildPostCommand(url: string): string {
+    const escapedUrl = url.replace(/'/g, "''");
+    return `
+      select
+        net.http_post(
+          url := '${escapedUrl}',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ${escapedCronSecret}'
+          ),
+          body := '{}'::jsonb
+        );
+    `.trim();
+  }
+
+  const tickCommand = buildPostCommand(tickUrl);
+  const thumbBackfillCommand = buildPostCommand(thumbBackfillUrl);
+  const assetTransformCommand = buildPostCommand(assetTransformUrl);
 
   try {
     await sql`create extension if not exists pg_cron`;
     await sql`create extension if not exists pg_net`;
 
-    await sql`select cron.unschedule(jobid) from cron.job where jobname in ('vidclaw-task-tick', 'vidclaw-timeout-fallback')`;
+    await sql`select cron.unschedule(jobid) from cron.job where jobname in ('vidclaw-task-tick', 'vidclaw-timeout-fallback', 'vidclaw-gallery-thumbnail-backfill', 'vidclaw-asset-transform-drain')`;
 
     await sql.unsafe(`
       select cron.schedule(
@@ -66,10 +75,34 @@ async function main() {
       )
     `);
 
+    // Thumbnail backfill — every 5 minutes is enough; processes up to
+    // DEFAULT_BATCH (5) gallery rows per run. Catches up within ~10 min
+    // even after a publish burst.
+    await sql.unsafe(`
+      select cron.schedule(
+        'vidclaw-gallery-thumbnail-backfill',
+        '*/5 * * * *',
+        $$${thumbBackfillCommand}$$
+      )
+    `);
+
+    // Asset-transform (AI 抠图 / 9:16 白底) drain — every minute. The route
+    // itself is self-draining (up to MAX_CONCURRENT rounds per Vercel
+    // function invocation) but needs SOMEONE to ring the bell after users
+    // leave the page. Without this the tail of a batch gets stranded in
+    // `pending` forever because the only other trigger is user action.
+    await sql.unsafe(`
+      select cron.schedule(
+        'vidclaw-asset-transform-drain',
+        '* * * * *',
+        $$${assetTransformCommand}$$
+      )
+    `);
+
     const jobs = await sql`
       select jobid, jobname, schedule, active
       from cron.job
-      where jobname in ('vidclaw-task-tick', 'vidclaw-timeout-fallback')
+      where jobname in ('vidclaw-task-tick', 'vidclaw-timeout-fallback', 'vidclaw-gallery-thumbnail-backfill', 'vidclaw-asset-transform-drain')
       order by jobname
     `;
 
