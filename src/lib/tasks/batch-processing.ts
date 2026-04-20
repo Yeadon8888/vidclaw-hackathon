@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { taskGroups, taskItems, taskSlots, tasks } from "@/lib/db/schema";
 import type { TaskParamsSnapshot } from "@/lib/video/types";
@@ -10,6 +10,7 @@ import { recomputeTaskGroupSummary } from "@/lib/tasks/groups";
 import { resolveBatchUnitsPerProduct } from "@/lib/tasks/batch-math";
 import { createVideoTasksForModelId } from "@/lib/video/service";
 import { initializeSlots, submitPendingSlots } from "@/lib/tasks/fulfillment";
+import { insertTaskItemsFromSubmission } from "@/lib/tasks/items";
 import {
   delayStaggeredSubmission,
   getMaxBatchGroupSubmissionsPerTick,
@@ -39,6 +40,8 @@ export async function processPendingBatchTasks(params: {
   if (!group) {
     return { processed: 0, failed: 0 };
   }
+
+  await resetStaleAnalyzingTasks(group.id);
 
   const customPrompts = await loadUserPrompts(group.userId);
   const activeChildTasks = await db
@@ -73,9 +76,13 @@ export async function processPendingBatchTasks(params: {
   let submissionIndex = 0;
 
   for (const queuedTask of queuedTasks) {
+    // Stamp `started_at` at claim-time so resetStaleAnalyzingTasks can
+    // measure "stuck in analyzing" against actual claim time, not against
+    // task creation (which would falsely qualify queued-for-a-while tasks
+    // the moment they're claimed).
     const [claimedTask] = await db
       .update(tasks)
-      .set({ status: "analyzing", errorMessage: null })
+      .set({ status: "analyzing", errorMessage: null, startedAt: new Date() })
       .where(and(eq(tasks.id, queuedTask.id), eq(tasks.status, "pending")))
       .returning();
 
@@ -170,13 +177,11 @@ export async function processPendingBatchTasks(params: {
           userId: claimedTask.userId,
         });
 
-        for (const providerTaskId of submitted.providerTaskIds) {
-          await db.insert(taskItems).values({
-            taskId: claimedTask.id,
-            providerTaskId,
-            status: "PENDING",
-          });
-        }
+        await insertTaskItemsFromSubmission({
+          taskId: claimedTask.id,
+          providerTaskIds: submitted.providerTaskIds,
+          immediateResults: submitted.immediateResults,
+        });
       }
 
       processed += 1;
@@ -195,4 +200,34 @@ export async function processPendingBatchTasks(params: {
 
   await recomputeTaskGroupSummary(group.id);
   return { processed, failed };
+}
+
+/**
+ * Tasks claimed to `analyzing` that never progress to `generating` within
+ * STALE_ANALYZING_MS are retryable: typically the prior tick got
+ * interrupted by Vercel's 60s function timeout mid-Gemini call, before
+ * the catch block could refund. Roll them back to `pending` so the
+ * next tick re-claims and retries.
+ *
+ * Only resets tasks that have zero task_items (anything with a provider
+ * id is already live and shouldn't be rewound).
+ */
+const STALE_ANALYZING_MS = 5 * 60 * 1000;
+
+async function resetStaleAnalyzingTasks(taskGroupId: string) {
+  const cutoffIso = new Date(Date.now() - STALE_ANALYZING_MS).toISOString();
+  // Pass the cutoff as an ISO string — postgres.js v3.4 in the Vercel
+  // runtime throws ERR_INVALID_ARG_TYPE when a Date lands inside a raw
+  // sql`` template param slot, so keep it stringified here.
+  await db
+    .update(tasks)
+    .set({ status: "pending", errorMessage: null, startedAt: null })
+    .where(
+      and(
+        eq(tasks.taskGroupId, taskGroupId),
+        eq(tasks.status, "analyzing"),
+        sql`COALESCE(${tasks.startedAt}, ${tasks.createdAt}) < ${cutoffIso}::timestamptz`,
+        sql`NOT EXISTS (SELECT 1 FROM ${taskItems} WHERE ${taskItems.taskId} = ${tasks.id})`,
+      ),
+    );
 }

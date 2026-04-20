@@ -28,6 +28,7 @@ const PRODUCTION_ENV_FILE = path.join(REPO_ROOT, ".env.vercel.production");
 const SHOULD_FIX_ROOT_DIRECTORY = process.argv.includes("--fix-root-directory");
 const SHOULD_DEPLOY = process.argv.includes("--deploy");
 const SHOULD_MIGRATE = process.argv.includes("--migrate-production");
+const ALLOW_DIRTY_TREE = process.argv.includes("--allow-dirty");
 
 function readLinkedProject(): LinkedProject {
   if (!fs.existsSync(PROJECT_FILE)) {
@@ -262,7 +263,74 @@ function baselineLegacyProductionDatabase(databaseUrl: string) {
   });
 }
 
+function captureGit(args: string[]): string {
+  try {
+    return execFileSync("git", args, {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch (error) {
+    const message =
+      error instanceof Error && "stderr" in error
+        ? String((error as { stderr?: Buffer | string }).stderr || "").trim()
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    throw new Error(message || `git ${args.join(" ")} 失败。`);
+  }
+}
+
+function assertDeployableGitState() {
+  // Block CLI uploads from silently shipping uncommitted code. When we hit
+  // a prod bug it must be reproducible from a commit SHA, not from whatever
+  // happened to be in someone's working tree at deploy time.
+  const status = captureGit(["status", "--porcelain"]);
+  if (status && !ALLOW_DIRTY_TREE) {
+    throw new Error(
+      [
+        "工作区有未提交改动，禁止直接上传到生产：",
+        status,
+        "",
+        "要么先 commit + push，要么在确实需要热修复时手动加 --allow-dirty。",
+      ].join("\n"),
+    );
+  }
+
+  const head = captureGit(["rev-parse", "HEAD"]);
+  const branch = captureGit(["rev-parse", "--abbrev-ref", "HEAD"]);
+
+  // Verify HEAD is reachable from origin — otherwise the deploy SHA Vercel
+  // records is a local-only commit that no teammate can check out.
+  let remoteHasHead = false;
+  try {
+    const containing = captureGit([
+      "branch",
+      "-r",
+      "--contains",
+      head,
+    ]);
+    remoteHasHead = containing.length > 0;
+  } catch {
+    remoteHasHead = false;
+  }
+
+  if (!remoteHasHead && !ALLOW_DIRTY_TREE) {
+    throw new Error(
+      [
+        `当前 HEAD (${head.slice(0, 12)}, 分支 ${branch}) 尚未推到任何远端分支。`,
+        "先 git push，让 Vercel 记到的 commit SHA 和实际代码对得上。",
+      ].join("\n"),
+    );
+  }
+
+  console.log(
+    `Git 状态校验通过: HEAD=${head.slice(0, 12)} branch=${branch} dirty=${status ? "yes" : "no"} remoteHasHead=${remoteHasHead}`,
+  );
+}
+
 function deployProduction() {
+  assertDeployableGitState();
   console.log("开始执行 `vercel deploy --prod --yes` ...");
   runCommand({
     command: "vercel",
