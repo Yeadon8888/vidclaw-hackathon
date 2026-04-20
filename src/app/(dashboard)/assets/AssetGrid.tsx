@@ -481,13 +481,14 @@ export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
                   className="aspect-square w-full object-cover"
                 />
 
-                {/* Selection checkbox — always visible, taps don't interfere with image. */}
+                {/* Selection checkbox — z-10 so the hover gradient overlay below
+                    does not steal pointer events even at opacity-0. */}
                 <button
                   type="button"
                   aria-label={isSelected ? "取消选中" : "选中"}
                   aria-pressed={isSelected}
                   onClick={() => toggleSelect(asset.id)}
-                  className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border text-white shadow transition-colors ${
+                  className={`absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border text-white shadow transition-colors ${
                     isSelected
                       ? "border-[var(--vc-accent)] bg-[var(--vc-accent)]"
                       : "border-white/60 bg-black/40 hover:bg-black/60"
@@ -503,7 +504,7 @@ export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
                 )}
 
                 {inFlight && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 text-white">
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 text-white">
                     <Loader2 className="h-6 w-6 animate-spin" />
                     <span className="text-xs">
                       {job?.status === "processing" ? "AI 处理中..." : "排队中..."}
@@ -517,8 +518,8 @@ export function AssetGrid({ initialAssets }: { initialAssets: UserAsset[] }) {
                   </div>
                 )}
 
-                <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                  <div className="flex w-full items-center justify-between gap-2 p-2">
+                <div className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/70 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  <div className="pointer-events-auto flex w-full items-center justify-between gap-2 p-2">
                     <span className="truncate text-xs text-white">
                       {asset.filename}
                     </span>
