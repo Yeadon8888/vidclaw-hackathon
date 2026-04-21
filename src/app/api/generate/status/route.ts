@@ -75,8 +75,30 @@ async function handleStandardPoll(providerTaskIds: string[], userId: string) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
+  // Build a quick lookup of currently-stored row state so we can short-circuit
+  // already-terminal items. Without this, synchronous providers like grok2api
+  // (which write SUCCESS straight into task_items at submission time) would
+  // get clobbered the next time the client polls — queryVideoTaskStatus would
+  // return UNKNOWN/FAILED and we'd overwrite the good row.
+  const itemRowByProviderId = new Map(
+    matchedItems.map((row) => [
+      row.task_items.providerTaskId,
+      row.task_items,
+    ]),
+  );
+
   const results = await Promise.all(
     providerTaskIds.map(async (taskId) => {
+      const existing = itemRowByProviderId.get(taskId);
+      if (existing && (existing.status === "SUCCESS" || existing.status === "FAILED")) {
+        return {
+          taskId,
+          status: existing.status,
+          progress: existing.progress ?? "100%",
+          url: existing.resultUrl ?? undefined,
+          failReason: existing.failReason ?? undefined,
+        };
+      }
       try {
         const result = await queryVideoTaskStatus({
           modelId: scope.modelId,

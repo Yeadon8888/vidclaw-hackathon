@@ -6,7 +6,9 @@
 import type { Model } from "@/lib/db/schema";
 import { MODEL_CAPABILITIES } from "@/lib/models/capabilities";
 import { getActiveModelByCapability } from "@/lib/models/repository";
-import type { OutputLanguage, ScriptResult } from "@/lib/video/types";
+import type { ScriptResult } from "@/lib/video/types";
+import type { OutputLanguage } from "@/lib/video/languages";
+import { getLanguage } from "@/lib/video/languages";
 import { buildScriptInstruction } from "@/lib/video/prompt";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview";
@@ -29,62 +31,20 @@ export function resolveLanguageSpec(outputLanguage?: OutputLanguage): {
   content: string;
   instruction: string;
 } {
-  switch (outputLanguage) {
-    case "en":
-      return {
-        spoken: "English",
-        content: "English",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in English.",
-      };
-    case "es-mx":
-      return {
-        spoken: "Mexican Spanish",
-        content: "Mexican Spanish",
-        instruction: "All spoken dialogue and voiceover must be in Mexican Spanish. Title, caption, hashtags, and first_comment must also be in Mexican Spanish. Do not output English copy unless explicitly requested.",
-      };
-    case "es":
-      return {
-        spoken: "Spanish",
-        content: "Spanish",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in Spanish.",
-      };
-    case "ms":
-      return {
-        spoken: "Malay (Malaysia)",
-        content: "Malay (Malaysia)",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in Malay as used in Malaysia.",
-      };
-    case "en-my":
-      return {
-        spoken: "Malaysian English",
-        content: "Malaysian English",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in Malaysian English.",
-      };
-    case "pt-br":
-      return {
-        spoken: "Brazilian Portuguese",
-        content: "Brazilian Portuguese",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in Brazilian Portuguese.",
-      };
-    case "id":
-      return {
-        spoken: "Indonesian",
-        content: "Indonesian",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in Indonesian.",
-      };
-    case "ar":
-      return {
-        spoken: "Arabic",
-        content: "Arabic",
-        instruction: "All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in Arabic.",
-      };
-    default:
-      return {
-        spoken: "follow user request if specified; otherwise match target market",
-        content: "follow user request if specified; otherwise match target market",
-        instruction: "If the user explicitly specifies a language, all spoken dialogue, voiceover, title, caption, hashtags, and first_comment must use that language consistently. Do not silently switch to English.",
-      };
+  const lang = getLanguage(outputLanguage);
+  if (!lang || !lang.spokenName) {
+    return {
+      spoken: "follow user request if specified; otherwise match target market",
+      content: "follow user request if specified; otherwise match target market",
+      instruction:
+        "If the user explicitly specifies a language, all spoken dialogue, voiceover, title, caption, hashtags, and first_comment must use that language consistently. Do not silently switch to English.",
+    };
   }
+  return {
+    spoken: lang.spokenName,
+    content: lang.spokenName,
+    instruction: `All spoken dialogue, voiceover, title, caption, hashtags, and first_comment must be in ${lang.spokenName}. Do not silently switch to English or any other language.`,
+  };
 }
 
 /** Appended to custom prompts that don't include the JSON schema */

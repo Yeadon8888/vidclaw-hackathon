@@ -26,7 +26,8 @@ const nextConfig: NextConfig = {
     ],
   },
   // Serverless function timeout for SSE streaming (Vercel Pro)
-  serverExternalPackages: ["postgres", "sharp"],
+  // @ffmpeg-installer ships a native binary that must NOT be bundled by webpack.
+  serverExternalPackages: ["postgres", "sharp", "@ffmpeg-installer/ffmpeg"],
   // Security headers
   headers: async () => [
     {

@@ -15,9 +15,10 @@ import {
   downloadVideoFromUrl,
 } from "@/lib/tikhub";
 import { db } from "@/lib/db";
-import { tasks, taskItems, creditTxns, users } from "@/lib/db/schema";
+import { tasks, creditTxns, users } from "@/lib/db/schema";
 import { eq, sql, and } from "drizzle-orm";
 import { failTaskAndRefund } from "@/lib/tasks/reconciliation";
+import { insertTaskItemsFromSubmission } from "@/lib/tasks/items";
 import {
   createVideoTasks,
   resolveActiveVideoModel,
@@ -90,7 +91,10 @@ export async function POST(req: NextRequest) {
   const effectiveSourceMode =
     sourceMode ?? (type === "video_key" ? "upload" : type);
   const effectiveCreativeBrief = creativeBrief?.trim() || modification?.trim() || undefined;
-  const normalizedSelectedImageIds = selectedImageIds?.slice(0, 1);
+  // Pass up to MAX_REFERENCE_IMAGES selections through; the provider adapter
+  // narrows further if its model only supports one (e.g. grok-imagine-video).
+  // Don't pre-truncate to 1 here — that silently dropped user-selected images.
+  const normalizedSelectedImageIds = selectedImageIds?.slice(0, MAX_REFERENCE_IMAGES);
   const resolvedOutputLanguage = resolveOutputLanguage(
     params.outputLanguage,
     params.platform,
@@ -127,10 +131,13 @@ export async function POST(req: NextRequest) {
         log(`用户 ${user.email} | 余额 ${user.credits} | 本次消耗 ${totalCost} 积分`);
 
         // ── Step 1: Get user reference images (from DB, newest first) ──
+        // No explicit selection → fall back to the user's most recent
+        // MAX_REFERENCE_IMAGES uploads. Provider adapters narrow further
+        // if their model only supports one image (e.g. grok).
         const selectedAssets = await resolveSelectedImageAssets({
           userId: user.id,
           selectedImageIds: normalizedSelectedImageIds,
-          fallbackLimit: 1,
+          fallbackLimit: MAX_REFERENCE_IMAGES,
         });
         const imageUrls = selectedAssets.map((asset) => asset.url);
         const referenceImageUrls = imageUrls.slice(0, MAX_REFERENCE_IMAGES);
@@ -431,6 +438,9 @@ export async function POST(req: NextRequest) {
 
         // ── Step 5: Submit tasks (backfill = slot-based, standard = direct) ──
         let providerTaskIds: string[];
+        let immediateResults:
+          | (import("@/lib/video/types").TaskStatusResult | null)[]
+          | undefined;
         let resolvedVideoParams: VideoParams;
 
         if (fulfillmentMode === "backfill_until_target") {
@@ -488,6 +498,7 @@ export async function POST(req: NextRequest) {
               userId: user.id,
             });
             providerTaskIds = submitted.providerTaskIds;
+            immediateResults = submitted.immediateResults;
             resolvedVideoParams = submitted.resolvedParams;
             log(`任务已提交: ${providerTaskIds.join(", ")}`);
           } catch (e) {
@@ -526,14 +537,13 @@ export async function POST(req: NextRequest) {
             return;
           }
 
-          // Insert task items for standard mode
-          for (const providerTaskId of providerTaskIds) {
-            await db.insert(taskItems).values({
-              taskId: task.id,
-              providerTaskId,
-              status: "PENDING",
-            });
-          }
+          // Insert task items (synchronous providers like grok2api may
+          // return immediateResults so the rows go in already as SUCCESS).
+          await insertTaskItemsFromSubmission({
+            taskId: task.id,
+            providerTaskIds,
+            immediateResults,
+          });
         }
 
         // ── Step 6: Return task IDs ──

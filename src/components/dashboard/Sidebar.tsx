@@ -53,14 +53,19 @@ export function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProps) {
 
   const sidebarContent = (
     <>
-      {/* Logo */}
+      {/* Logo — clicking returns to the public landing page */}
       <div className="flex items-center justify-between px-5 py-5">
-        <div className="flex items-center gap-2.5">
+        <Link
+          href="/"
+          aria-label="返回首页"
+          title="返回首页"
+          className="flex items-center gap-2.5 rounded-[var(--vc-radius-sm)] transition-opacity duration-150 hover:opacity-80"
+        >
           <span className="text-lg">⚡</span>
           <span className="vc-gradient-text text-lg font-bold tracking-tight">
             VidClaw
           </span>
-        </div>
+        </Link>
         {/* Mobile close button */}
         <button
           onClick={onMobileClose}

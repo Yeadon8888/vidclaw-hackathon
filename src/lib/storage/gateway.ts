@@ -116,6 +116,65 @@ export async function uploadAsset(params: {
   };
 }
 
+export async function uploadThumbnail(params: {
+  userId: string;
+  data: ArrayBuffer | Buffer;
+  contentType: string;
+}): Promise<StoredAsset> {
+  const config = getConfig();
+  if (!config) throw new Error("UPLOAD_API_URL or UPLOAD_API_KEY is not set");
+
+  const ext = params.contentType.includes("png") ? "png" : "jpg";
+  const key = `${buildUserPrefix(config, params.userId)}/thumb-${crypto.randomUUID()}.${ext}`;
+  // Normalize Buffer / SharedArrayBuffer to a fresh ArrayBuffer slice.
+  const body: ArrayBuffer = params.data instanceof Buffer
+    ? params.data.buffer.slice(params.data.byteOffset, params.data.byteOffset + params.data.byteLength) as ArrayBuffer
+    : (params.data as ArrayBuffer);
+  const result = await requestJson<StoredAsset>({
+    method: "POST",
+    url: `${config.baseUrl}/upload?key=${encodeURIComponent(key)}`,
+    headers: {
+      "x-upload-key": config.apiKey,
+      "Content-Type": params.contentType,
+    },
+    body,
+    timeoutSeconds: 60,
+  });
+  return result;
+}
+
+/**
+ * Upload a video that does not belong to a single end user — used by
+ * provider adapters that must rescue an upstream file immediately (e.g.
+ * grok2api whose railway container purges files within minutes).
+ * Stored under `_shared/<bucket>/` so it's discoverable but won't collide
+ * with per-user listings.
+ */
+export async function uploadSharedVideo(params: {
+  bucket: string;
+  filename: string;
+  data: ArrayBuffer;
+  contentType: string;
+}): Promise<StoredAsset> {
+  const config = getConfig();
+  if (!config) throw new Error("UPLOAD_API_URL or UPLOAD_API_KEY is not set");
+
+  const safeBucket = params.bucket.replace(/[^a-zA-Z0-9_-]/g, "");
+  const ext = getExtension(params.filename);
+  const key = `${config.prefix}/_shared/${safeBucket}/vid-${crypto.randomUUID()}.${ext}`;
+  const result = await requestJson<StoredAsset>({
+    method: "POST",
+    url: `${config.baseUrl}/upload?key=${encodeURIComponent(key)}`,
+    headers: {
+      "x-upload-key": config.apiKey,
+      "Content-Type": params.contentType || "video/mp4",
+    },
+    body: params.data,
+    timeoutSeconds: 180,
+  });
+  return result;
+}
+
 export async function uploadVideo(params: {
   userId: string;
   filename: string;

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, creditTxns, tasks, taskItems } from "@/lib/db/schema";
+import { users, creditTxns, tasks } from "@/lib/db/schema";
+import { insertTaskItemsFromSubmission } from "@/lib/tasks/items";
 import {
   createVideoTasks,
   getActiveVideoModelBySlug,
@@ -124,14 +125,13 @@ export async function POST(req: NextRequest) {
       userId: user.id,
     });
 
-    // Record task items
-    for (const providerTaskId of result.providerTaskIds) {
-      await db.insert(taskItems).values({
-        taskId: task.id,
-        providerTaskId,
-        status: "PENDING",
-      });
-    }
+    // Record task items (synchronous providers may return immediateResults
+    // so the rows go in already as SUCCESS).
+    await insertTaskItemsFromSubmission({
+      taskId: task.id,
+      providerTaskIds: result.providerTaskIds,
+      immediateResults: result.immediateResults,
+    });
 
     return NextResponse.json({
       ok: true,

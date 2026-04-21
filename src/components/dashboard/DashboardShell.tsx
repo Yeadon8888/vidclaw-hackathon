@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { AuthRecovery } from "@/components/auth/AuthRecovery";
 import type { User } from "@/lib/db/schema";
 
 interface DashboardShellProps {
@@ -18,6 +19,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   return (
     <div className="flex h-screen bg-[var(--vc-bg-root)]">
+      <AuthRecovery />
       <Sidebar user={user} mobileOpen={sidebarOpen} onMobileClose={closeSidebar} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar user={user} onMenuClick={openSidebar} />

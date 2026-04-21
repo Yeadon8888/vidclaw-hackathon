@@ -8,24 +8,20 @@ import {
 } from "@/components/generate/model-selection";
 import type { GenerateTab } from "@/components/generate/generate-config";
 import type { VideoDuration } from "@/lib/video/types";
+import { LANGUAGES } from "@/lib/video/languages";
 
 const selectClass =
   "rounded-full bg-[var(--vc-bg-root)] border border-[var(--vc-border)] px-3 py-2 text-xs text-white outline-none cursor-pointer transition-all duration-150 hover:border-[var(--vc-accent)]/50 focus:border-[var(--vc-accent)] sm:text-sm sm:px-4";
 
+// Language options rendered directly from the shared SSOT. To add a new
+// language, edit src/lib/video/languages.ts — do NOT duplicate the list here.
 const LANGUAGE_OPTIONS: Array<{
   value: GenerateParams["outputLanguage"];
   label: string;
-}> = [
-  { value: "auto", label: "语言自动" },
-  { value: "en", label: "英语" },
-  { value: "es-mx", label: "墨西哥西语" },
-  { value: "es", label: "西班牙语" },
-  { value: "ms", label: "马来西亚语" },
-  { value: "en-my", label: "马来西亚英语" },
-  { value: "pt-br", label: "巴西葡语" },
-  { value: "id", label: "印尼语" },
-  { value: "ar", label: "阿拉伯语" },
-];
+}> = LANGUAGES.map((lang) => ({
+  value: lang.code as GenerateParams["outputLanguage"],
+  label: lang.label,
+}));
 
 export function ParamBar(props: {
   activeTab: GenerateTab;
