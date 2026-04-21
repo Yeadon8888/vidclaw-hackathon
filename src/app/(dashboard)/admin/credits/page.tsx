@@ -1,31 +1,68 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 
 interface CreditTxn {
   id: string;
   userId: string;
-  type: "grant" | "consume" | "refund" | "adjust";
+  type: "grant" | "consume" | "refund" | "adjust" | "payment";
   amount: number;
   reason: string | null;
   balanceAfter: number;
   createdAt: string;
 }
 
+const TYPE_LABELS: Record<CreditTxn["type"], string> = {
+  grant: "充值",
+  consume: "消费",
+  refund: "退款",
+  adjust: "调整",
+  payment: "支付",
+};
+
+const TYPE_STYLES: Record<CreditTxn["type"], string> = {
+  grant: "bg-green-500/20 text-green-400",
+  consume: "bg-red-500/20 text-red-400",
+  refund: "bg-blue-500/20 text-blue-400",
+  adjust: "bg-zinc-700 text-zinc-300",
+  payment: "bg-cyan-500/20 text-cyan-300",
+};
+
 export default function AdminCreditsPage() {
-  const [userId, setUserId] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialUserId = searchParams.get("userId") ?? "";
+  const initialEmail = searchParams.get("email") ?? "";
+
+  const [userId, setUserId] = useState(initialUserId);
+  const [email] = useState(initialEmail);
   const [transactions, setTransactions] = useState<CreditTxn[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchTxns = useCallback(async () => {
-    if (!userId.trim()) return;
-    setLoading(true);
-    const res = await fetch(`/api/admin/credits?userId=${encodeURIComponent(userId)}`);
-    const data = await res.json();
-    setTransactions(data.transactions ?? []);
-    setLoading(false);
-  }, [userId]);
+  const fetchTxns = useCallback(
+    async (targetUserId: string) => {
+      if (!targetUserId.trim()) return;
+      setLoading(true);
+      const res = await fetch(
+        `/api/admin/credits?userId=${encodeURIComponent(targetUserId)}`,
+      );
+      const data = await res.json();
+      setTransactions(data.transactions ?? []);
+      setLoading(false);
+    },
+    [],
+  );
+
+  // 从 URL 进来时自动查询一次。
+  useEffect(() => {
+    if (initialUserId) {
+      void fetchTxns(initialUserId);
+    }
+  }, [initialUserId, fetchTxns]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,17 +73,44 @@ export default function AdminCreditsPage() {
 
       <AdminTabs />
 
-      {/* Search by User ID */}
+      {/* 上下文提示：从用户管理跳进来时，展示当前查看的是谁 */}
+      {userId && email && (
+        <div className="flex items-center justify-between gap-3 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] px-4 py-3">
+          <div className="flex flex-col text-sm">
+            <span className="text-[var(--vc-text-muted)]">当前查看</span>
+            <span className="font-mono text-white">{email}</span>
+            <span className="font-mono text-xs text-zinc-500">{userId}</span>
+          </div>
+          <Link
+            href="/admin"
+            className="rounded-[var(--vc-radius-sm)] border border-[var(--vc-border)] px-3 py-1 text-xs text-[var(--vc-text-muted)] transition-colors hover:text-white"
+          >
+            ← 返回用户列表
+          </Link>
+        </div>
+      )}
+
+      {/* Search by User ID — 保留作为按 UUID 手动查询的逃生通道 */}
       <div className="flex items-center gap-3">
         <input
           type="text"
           placeholder="输入用户 ID 查询积分流水..."
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && userId.trim()) {
+              router.replace(`/admin/credits?userId=${encodeURIComponent(userId.trim())}`);
+              void fetchTxns(userId.trim());
+            }
+          }}
           className="w-96 rounded-[var(--vc-radius-md)] border border-[var(--vc-border)] bg-[var(--vc-bg-root)] px-3 py-2 text-sm text-white placeholder-zinc-500 transition-colors focus:border-[var(--vc-accent)] focus:outline-none"
         />
         <button
-          onClick={fetchTxns}
+          onClick={() => {
+            if (!userId.trim()) return;
+            router.replace(`/admin/credits?userId=${encodeURIComponent(userId.trim())}`);
+            void fetchTxns(userId.trim());
+          }}
           disabled={!userId.trim()}
           className="vc-gradient-btn rounded-[var(--vc-radius-md)] px-4 py-2 text-sm"
         >
@@ -82,23 +146,9 @@ export default function AdminCreditsPage() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${
-                          txn.type === "grant"
-                            ? "bg-green-500/20 text-green-400"
-                            : txn.type === "consume"
-                              ? "bg-red-500/20 text-red-400"
-                              : txn.type === "refund"
-                                ? "bg-blue-500/20 text-blue-400"
-                                : "bg-zinc-700 text-zinc-300"
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-xs ${TYPE_STYLES[txn.type] ?? TYPE_STYLES.adjust}`}
                       >
-                        {txn.type === "grant"
-                          ? "充值"
-                          : txn.type === "consume"
-                            ? "消费"
-                            : txn.type === "refund"
-                              ? "退款"
-                              : "调整"}
+                        {TYPE_LABELS[txn.type] ?? txn.type}
                       </span>
                     </td>
                     <td

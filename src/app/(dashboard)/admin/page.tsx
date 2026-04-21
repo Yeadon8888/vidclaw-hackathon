@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 
 interface User {
@@ -151,6 +152,12 @@ export default function AdminUsersPage() {
                       >
                         充值
                       </button>
+                      <Link
+                        href={`/admin/credits?userId=${encodeURIComponent(u.id)}&email=${encodeURIComponent(u.email)}`}
+                        className="rounded border border-[var(--vc-border)] px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-[var(--vc-accent)] hover:text-[var(--vc-accent)]"
+                      >
+                        流水
+                      </Link>
                       <button
                         onClick={() =>
                           updateUser(u.id, {
