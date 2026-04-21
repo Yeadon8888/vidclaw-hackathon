@@ -40,3 +40,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tool state — never commit
+/.claude/
+/.playwright-mcp/
+
+# SEO / one-off verification screenshots captured at repo root
+# (don't touch anything under src/ or docs/ — this is for ad-hoc screenshots
+#  engineers drop while verifying Search Console / Bing Webmaster / 百度站长 / etc.)
+/baidu-*.png
+/bing-*.png
+/gsc-*.png
+/yandex-*.png
+/pricing-after.png
