@@ -215,7 +215,7 @@ export const yunwuProvider: VideoProviderAdapter = {
       taskIds.push(taskId);
     }
 
-    return taskIds;
+    return { providerTaskIds: taskIds };
   },
   async queryTaskStatus({ model, taskId }) {
     const result = await apiRequest(model, "GET", QUERY_ENDPOINT, {

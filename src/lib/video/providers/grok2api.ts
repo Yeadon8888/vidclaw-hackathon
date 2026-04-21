@@ -1,4 +1,5 @@
 import type {
+  ProviderCreateResult,
   VideoModelRecord,
   VideoProviderAdapter,
   VideoProviderCapabilities,
@@ -9,36 +10,36 @@ import {
   extractProviderErrorMessage,
   isRetryableOverload,
 } from "./shared";
+import { isUploadGatewayEnabled, uploadSharedVideo } from "@/lib/storage/gateway";
 
 /**
- * grok2api adapter.
+ * grok2api adapter — image-to-video via OpenAI-style chat completions.
  *
- * Target API: a self-hosted reverse-proxy for grok.com image-to-video
- * (https://grok2api-production-3630.up.railway.app).
+ * Backend: a self-hosted reverse proxy of Grok Imagine
+ * (https://grok2api-production-3630.up.railway.app, source:
+ * github.com/chenyme/grok2api).
  *
- * Endpoints:
- *   POST /v1/videos            multipart/form-data  — submit a task
- *   GET  /v1/videos/{taskId}   json                 — poll a task
+ * Why /v1/chat/completions and not /v1/videos:
+ *   The form-data /v1/videos endpoint treats the reference image more like
+ *   a "vibe / style hint" — empirically it freely reinvents the product's
+ *   logo, colors, and packaging text. The OpenAI-compatible chat endpoint
+ *   accepts the same image as a multimodal `image_url` content block and
+ *   actually pins the video to that exact frame (verified: SCVCN sunglasses
+ *   + black studio pedestal preserved pixel-near-identically).
  *
- * Constraints enforced upstream:
- *   - `seconds` must be 6 or 10
- *   - `input_reference[image_url]` is mandatory — this provider is
- *     image-to-video only; theme-only mode will be rejected
- *   - consecutive requests within the same Grok account can trigger
- *     429; callers should space them out (batch-queue already does)
+ * Lifecycle: synchronous. Unlike most async-poll providers, chat completions
+ * blocks until the video is ready and returns the URL in
+ * `choices[0].message.content`. createTasks() waits the full 60-90s, rehosts
+ * the result to R2, and reports each slot as already SUCCESS via the
+ * `immediateResults` parallel array. The runner skips polling for those rows.
  */
 
 const DEFAULT_BASE_URL =
   "https://grok2api-production-3630.up.railway.app";
-const CREATE_ENDPOINT = "/v1/videos";
-const QUERY_ENDPOINT = "/v1/videos";
+const CHAT_ENDPOINT = "/v1/chat/completions";
 
 const ALLOWED_DURATIONS: VideoDuration[] = [6, 10];
 const DEFAULT_DURATION: VideoDuration = 6;
-
-const SUCCESS_STATES = new Set(["succeeded"]);
-const FAILURE_STATES = new Set(["failed", "cancelled"]);
-const ACTIVE_STATES = new Set(["queued", "processing", "pending"]);
 
 type GrokPreset = "normal" | "fun" | "spicy";
 type GrokResolutionName = "720p" | "480p";
@@ -61,7 +62,6 @@ function normalizeBaseUrl(raw?: string | null): string {
 
 function clampDuration(value: number | undefined): VideoDuration {
   if (value === 6 || value === 10) return value;
-  // Map anything else to the closest supported value.
   return value !== undefined && value > 7 ? 10 : DEFAULT_DURATION;
 }
 
@@ -70,10 +70,9 @@ function pickSize(
   resolutionName: GrokResolutionName,
 ): string {
   if (resolutionName === "480p") {
-    // The doc only lists these three as "base" sizes; 480p maps there.
     return orientation === "portrait" ? "720x1280" : "1280x720";
   }
-  // 720p recommended tier — use the upscaled sizes per doc section 3.1.
+  // 720p tier — upscaled per grok2api docs §3.1.
   return orientation === "portrait" ? "1024x1792" : "1792x1024";
 }
 
@@ -87,7 +86,18 @@ function resolveResolution(raw: unknown): GrokResolutionName {
   return SUPPORTED_RESOLUTIONS.includes(candidate) ? candidate : "720p";
 }
 
-async function postCreateTask(params: {
+interface ChatCompletionResponse {
+  id?: string;
+  choices?: Array<{
+    message?: {
+      content?: string;
+      reasoning_content?: string;
+    };
+  }>;
+  error?: { message?: string; code?: string };
+}
+
+async function postChatCompletion(params: {
   baseUrl: string;
   apiKey: string;
   prompt: string;
@@ -97,27 +107,44 @@ async function postCreateTask(params: {
   resolutionName: GrokResolutionName;
   preset: GrokPreset;
   modelName: string;
-}): Promise<string> {
-  const form = new FormData();
-  form.append("model", params.modelName);
-  form.append("prompt", params.prompt);
-  form.append("input_reference[image_url]", params.imageUrl);
-  form.append("seconds", String(params.duration));
-  form.append("size", params.size);
-  form.append("resolution_name", params.resolutionName);
-  form.append("preset", params.preset);
+}): Promise<{ chatCompletionId: string; videoUrl: string }> {
+  const body = {
+    model: params.modelName,
+    stream: false,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: params.prompt },
+          { type: "image_url", image_url: { url: params.imageUrl } },
+        ],
+      },
+    ],
+    video_config: {
+      seconds: params.duration,
+      size: params.size,
+      resolution_name: params.resolutionName,
+      preset: params.preset,
+    },
+  };
 
-  const response = await fetch(`${params.baseUrl}${CREATE_ENDPOINT}`, {
+  const response = await fetch(`${params.baseUrl}${CHAT_ENDPOINT}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${params.apiKey}` },
-    body: form,
+    headers: {
+      Authorization: `Bearer ${params.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    // Allow up to ~4 min — image-to-video typically completes in 60-90s
+    // but allow headroom for queueing on the upstream Grok account.
+    signal: AbortSignal.timeout(240_000),
   });
 
   const rawBody = await response.text();
-  let parsed: unknown = null;
+  let parsed: ChatCompletionResponse | null = null;
   if (rawBody.length > 0) {
     try {
-      parsed = JSON.parse(rawBody);
+      parsed = JSON.parse(rawBody) as ChatCompletionResponse;
     } catch {
       // non-json response — surface as-is below
     }
@@ -128,7 +155,6 @@ async function postCreateTask(params: {
     const err = new Error(
       `HTTP ${response.status}: ${message} | body=${rawBody.slice(0, 500)}`,
     );
-    // Attach hints that callers (task runner) can use for retry policy.
     (err as Error & { retryable?: boolean }).retryable = isRetryableOverload(
       response.status,
       message,
@@ -136,17 +162,55 @@ async function postCreateTask(params: {
     throw err;
   }
 
-  const obj = (parsed ?? {}) as { id?: unknown; error?: unknown };
-  if (typeof obj.id !== "string" || obj.id.length === 0) {
+  const content = parsed?.choices?.[0]?.message?.content?.trim();
+  if (!content || !/^https?:\/\//.test(content)) {
     throw new Error(
-      `grok2api did not return a task id | body=${rawBody.slice(0, 500)}`,
+      `grok2api chat returned no video URL | body=${rawBody.slice(0, 500)}`,
     );
   }
-  return obj.id;
+  // Use the chat completion id as the providerTaskId — short, unique, and
+  // looks like a real upstream identifier instead of a synthetic prefix.
+  // Fall back to a generated id if upstream omits it.
+  const chatCompletionId =
+    parsed?.id ?? `grok-chat-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return { chatCompletionId, videoUrl: content };
+}
+
+/**
+ * Pull the binary from grok2api (auth required) and re-host on our R2.
+ * We do this inside createTasks because the chat path delivers a URL that
+ * already requires the same Bearer token to access — handing that back to
+ * the browser would leak the key.
+ */
+async function rehostToR2(params: {
+  upstreamUrl: string;
+  apiKey: string;
+  fallbackName: string;
+}): Promise<string> {
+  if (!isUploadGatewayEnabled()) return params.upstreamUrl;
+  try {
+    const fileRes = await fetch(params.upstreamUrl, {
+      headers: { Authorization: `Bearer ${params.apiKey}` },
+    });
+    if (!fileRes.ok) return params.upstreamUrl;
+    const buffer = await fileRes.arrayBuffer();
+    const stored = await uploadSharedVideo({
+      bucket: "grok",
+      filename: `${params.fallbackName}.mp4`,
+      data: buffer,
+      contentType: fileRes.headers.get("content-type") ?? "video/mp4",
+    });
+    return stored.url;
+  } catch {
+    return params.upstreamUrl;
+  }
 }
 
 export const grok2apiProvider: VideoProviderAdapter = {
   id: "grok2api",
+  // The chat-completions multimodal path adheres best to the user's original
+  // image; any pre-resize hurts product fidelity (verified by 4-way ratio test).
+  wantsImagePrep: false,
 
   getCapabilities(): VideoProviderCapabilities {
     return {
@@ -155,7 +219,7 @@ export const grok2apiProvider: VideoProviderAdapter = {
     };
   },
 
-  async createTasks({ model, params }): Promise<string[]> {
+  async createTasks({ model, params }): Promise<ProviderCreateResult> {
     const baseUrl = normalizeBaseUrl(model.baseUrl);
     const apiKey = (model.apiKey ?? "").trim();
     if (!apiKey) {
@@ -180,14 +244,15 @@ export const grok2apiProvider: VideoProviderAdapter = {
       providerOptions.size ?? pickSize(params.orientation, resolutionName),
     );
 
-    // One POST per video — the upstream does not support batching in a
-    // single call. Use the first image as reference for every request
-    // unless the caller supplied more.
     const total = params.count ?? 1;
-    const taskIds: string[] = [];
+    const providerTaskIds: string[] = [];
+    const immediateResults: TaskStatusResult[] = [];
     for (let i = 0; i < total; i++) {
       const imageUrl = imageUrls[i] ?? imageUrls[0];
-      const id = await postCreateTask({
+
+      // Synchronously block on the chat endpoint — it returns the finished
+      // video URL in one shot. 60-90s typical, allow up to 240s in adapter.
+      const { chatCompletionId, videoUrl } = await postChatCompletion({
         baseUrl,
         apiKey,
         prompt: params.prompt,
@@ -198,97 +263,40 @@ export const grok2apiProvider: VideoProviderAdapter = {
         preset,
         modelName: model.slug,
       });
-      taskIds.push(id);
-    }
-    return taskIds;
-  },
 
-  async queryTaskStatus({ model, taskId }): Promise<TaskStatusResult> {
-    const baseUrl = normalizeBaseUrl(model.baseUrl);
-    const apiKey = (model.apiKey ?? "").trim();
+      // Rehost to R2 so the URL is bearer-token-free + persistent.
+      const finalUrl = await rehostToR2({
+        upstreamUrl: videoUrl,
+        apiKey,
+        fallbackName: `chat-${Date.now()}-${i}`,
+      });
 
-    const response = await fetch(`${baseUrl}${QUERY_ENDPOINT}/${taskId}`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-
-    const rawBody = await response.text();
-    let parsed: unknown = null;
-    if (rawBody.length > 0) {
-      try {
-        parsed = JSON.parse(rawBody);
-      } catch {
-        // fall through
-      }
-    }
-
-    if (!response.ok) {
-      const message = extractProviderErrorMessage(parsed) || rawBody || "Unknown error";
-      const { retryable, terminalClass } = classifyVideoProviderFailure(message);
-      return {
-        taskId,
-        status: "FAILED",
-        progress: "0%",
-        failReason: `HTTP ${response.status}: ${message}`,
-        retryable,
-        terminalClass,
-      };
-    }
-
-    const obj = (parsed ?? {}) as {
-      status?: unknown;
-      progress?: unknown;
-      video?: { url?: unknown; duration?: unknown } | null;
-      error?: { message?: unknown; code?: unknown } | null;
-    };
-
-    const statusStr = String(obj.status ?? "").toLowerCase();
-    const progressNum =
-      typeof obj.progress === "number" ? Math.max(0, Math.min(100, obj.progress)) : 0;
-    const progressStr = `${progressNum}%`;
-
-    if (SUCCESS_STATES.has(statusStr)) {
-      const url = obj.video?.url;
-      if (typeof url !== "string" || url.length === 0) {
-        return {
-          taskId,
-          status: "FAILED",
-          progress: "100%",
-          failReason: "grok2api reported succeeded but video.url is empty",
-          retryable: true,
-          terminalClass: "provider_error",
-        };
-      }
-      return {
-        taskId,
+      providerTaskIds.push(chatCompletionId);
+      immediateResults.push({
+        taskId: chatCompletionId,
         status: "SUCCESS",
         progress: "100%",
-        url,
-      };
+        url: finalUrl,
+      });
     }
+    return { providerTaskIds, immediateResults };
+  },
 
-    if (FAILURE_STATES.has(statusStr)) {
-      const message =
-        (typeof obj.error?.message === "string" && obj.error.message) ||
-        extractProviderErrorMessage(parsed) ||
-        statusStr ||
-        "unknown error";
-      const { retryable, terminalClass } = classifyVideoProviderFailure(message);
-      return {
-        taskId,
-        status: "FAILED",
-        progress: progressStr,
-        failReason: message,
-        retryable,
-        terminalClass,
-      };
-    }
-
-    // Treat queued / processing / unknown as PROCESSING so the runner keeps polling.
+  async queryTaskStatus({ taskId }): Promise<TaskStatusResult> {
+    // Should never get called: createTasks always returns immediateResults
+    // for grok, so the inserter writes SUCCESS rows directly. If we reach
+    // here it's an old row from before this refactor — treat as terminal
+    // failure so the slot retries via the modern path.
+    const message =
+      "grok task no longer queryable (chat-completions path is synchronous, no async polling)";
+    const { retryable, terminalClass } = classifyVideoProviderFailure(message);
     return {
       taskId,
-      status: "PROCESSING",
-      progress: progressStr,
+      status: "FAILED",
+      progress: "0%",
+      failReason: message,
+      retryable,
+      terminalClass,
     };
   },
 };

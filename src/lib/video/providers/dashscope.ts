@@ -145,7 +145,7 @@ export const dashscopeProvider: VideoProviderAdapter = {
       taskIds.push(taskId);
     }
 
-    return taskIds;
+    return { providerTaskIds: taskIds };
   },
 
   async queryTaskStatus({ model, taskId }) {

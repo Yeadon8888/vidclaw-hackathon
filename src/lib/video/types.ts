@@ -66,16 +66,9 @@ export interface ScriptResult {
   };
 }
 
-export type OutputLanguage =
-  | "auto"
-  | "en"
-  | "es-mx"
-  | "es"
-  | "ms"
-  | "en-my"
-  | "pt-br"
-  | "id"
-  | "ar";
+// See src/lib/video/languages.ts for the full list + how to add new ones.
+import type { OutputLanguage } from "./languages";
+export type { OutputLanguage };
 
 export type GenerateSourceMode = "theme" | "url" | "upload" | "batch";
 export type ImageSelectionMode = "single" | "sequence";

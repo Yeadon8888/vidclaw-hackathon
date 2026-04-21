@@ -1,3 +1,5 @@
+import { videoLanguageLabel } from "./languages";
+
 function normalizePrompt(value: string): string {
   return value.trim();
 }
@@ -49,29 +51,43 @@ export function buildScriptInstruction(params: {
 export function buildFinalVideoPrompt(params: {
   scriptPrompt: string;
   referenceImageCount?: number;
-  // Accepted to preserve caller API. Current implementation ignores it;
-  // language handling is applied upstream via resolveLanguageSpec.
   outputLanguage?: unknown;
 }): string {
   const basePrompt = normalizePrompt(params.scriptPrompt);
   const referenceImageCount = params.referenceImageCount ?? 0;
+  const languageLabel = videoLanguageLabel(params.outputLanguage);
 
-  if (referenceImageCount <= 0) {
-    return basePrompt;
+  const sections: string[] = [basePrompt];
+
+  if (languageLabel) {
+    sections.push(
+      [
+        `Spoken-language constraint:`,
+        `- Every character on screen must speak in ${languageLabel}.`,
+        `- Any voiceover, narration, or subtitles baked into the video must be in ${languageLabel}.`,
+        `- Lip-sync, mouth shapes, and pronunciation must match ${languageLabel}, not English.`,
+        `- Do not switch to English or any other language, even for product names or catchphrases, unless the user explicitly requested mixed language.`,
+      ].join("\n"),
+    );
   }
 
-  const firstLine =
-    referenceImageCount > 1
-      ? "Reference image constraints: treat all uploaded reference images as the same exact product shown from different angles or detail views."
-      : "Reference image constraints: treat the uploaded reference image as the exact product that must appear in the final video.";
+  if (referenceImageCount > 0) {
+    const firstLine =
+      referenceImageCount > 1
+        ? "Reference image constraints: treat all uploaded reference images as the same exact product shown from different angles or detail views."
+        : "Reference image constraints: treat the uploaded reference image as the exact product that must appear in the final video.";
 
-  return [
-    basePrompt,
-    firstLine,
-    "- Keep the same product identity, category, packaging, silhouette, materials, colors, label details, and other defining visual traits from the reference image(s).",
-    "- If the reference video conflicts with the reference image(s), preserve the product from the reference image(s) and only borrow pacing, composition, or storytelling from the video.",
-    "- The product from the reference image(s) must stay clearly visible and prominent in the hero shots and key scenes.",
-    "- Do not replace the product with another product, package, logo, or brand variation.",
-    "- Build the generated video around showcasing that exact product while following the requested creative direction.",
-  ].join("\n");
+    sections.push(
+      [
+        firstLine,
+        "- Keep the same product identity, category, packaging, silhouette, materials, colors, label details, and other defining visual traits from the reference image(s).",
+        "- If the reference video conflicts with the reference image(s), preserve the product from the reference image(s) and only borrow pacing, composition, or storytelling from the video.",
+        "- The product from the reference image(s) must stay clearly visible and prominent in the hero shots and key scenes.",
+        "- Do not replace the product with another product, package, logo, or brand variation.",
+        "- Build the generated video around showcasing that exact product while following the requested creative direction.",
+      ].join("\n"),
+    );
+  }
+
+  return sections.join("\n\n");
 }

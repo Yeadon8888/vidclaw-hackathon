@@ -20,10 +20,13 @@ type RatioStyle = "standard" | "compact";
 
 /**
  * standard = 9:16 / 16:9  (most Plato models)
- * compact  = 2:3  / 3:2   (Grok models, Yunwu)
+ * compact  = 2:3  / 3:2   (Yunwu)
+ *
+ * Note: grok2api skips this prep entirely (its adapter handles images itself
+ * via the multimodal chat-completions path), so the historical "grok" branch
+ * is gone. Add new entries here only when a provider actually reaches this code.
  */
-function getRatioStyle(modelSlug: string, provider: string): RatioStyle {
-  if (modelSlug.toLowerCase().includes("grok")) return "compact";
+function getRatioStyle(provider: string): RatioStyle {
   if (provider.toLowerCase() === "yunwu") return "compact";
   return "standard";
 }
@@ -48,7 +51,6 @@ function computeTargetDimensions(params: {
 export async function prepareImagesForProvider(params: {
   imageUrls: string[];
   orientation: "portrait" | "landscape";
-  modelSlug: string;
   provider: string;
   resolution?: string;
   userId: string;
@@ -58,7 +60,7 @@ export async function prepareImagesForProvider(params: {
 
   const { width, height } = computeTargetDimensions({
     orientation: params.orientation,
-    ratioStyle: getRatioStyle(params.modelSlug, params.provider),
+    ratioStyle: getRatioStyle(params.provider),
     resolution: params.resolution ?? "720P",
   });
 
@@ -99,3 +101,4 @@ export async function prepareImagesForProvider(params: {
 
   return results;
 }
+

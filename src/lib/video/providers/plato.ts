@@ -10,7 +10,6 @@ import {
   extractProviderErrorMessage,
   extractVideoUrlFromPayload,
   isRetryableOverload,
-  toGrokRatio,
   toPortraitLandscapeAspectRatio,
 } from "./shared";
 
@@ -135,29 +134,12 @@ function normalizeStatus(value: unknown): string {
   return String(value || "UNKNOWN").toUpperCase();
 }
 
-function isGrokSlug(slug: string): boolean {
-  return slug.toLowerCase().includes("grok");
-}
-
 function isSoraSlug(slug: string): boolean {
   return slug.toLowerCase().includes("sora");
 }
 
-/**
- * Map our internal duration to the nearest Grok-supported value (6 or 10).
- */
-function toGrokDuration(duration: number): 6 | 10 {
-  return duration <= 6 ? 6 : 10;
-}
-
 function inferPlatoCapabilities(model: VideoModelRecord): VideoProviderCapabilities {
   const slug = model.slug.toLowerCase();
-  if (isGrokSlug(slug)) {
-    return {
-      allowedDurations: [6, 10],
-      defaultDuration: 10,
-    };
-  }
   if (slug.includes("veo")) {
     return {
       allowedDurations: [8],
@@ -185,31 +167,20 @@ export const platoProvider: VideoProviderAdapter = {
     const taskIds: string[] = [];
     const providerOptions = params.providerOptions ?? {};
 
-    const grok = isGrokSlug(model.slug);
     const sora = isSoraSlug(model.slug);
     const images = params.imageUrls ?? [];
 
     let payload: Record<string, unknown>;
-    if (grok) {
-      // Grok-specific payload: ratio / resolution / images (max 1)
-      payload = {
-        prompt: params.prompt,
-        model: model.slug,
-        ratio: toGrokRatio(params.orientation),
-        resolution:
-          typeof providerOptions.resolution === "string"
-            ? providerOptions.resolution
-            : "720P",
-        duration: toGrokDuration(params.duration),
-        ...(images.length > 0 ? { images: [images[0]] } : {}),
-      };
-    } else if (sora) {
-      // Sora requires input_reference as an array of objects
+    if (sora) {
+      // Sora requires input_reference as an array of objects.
+      // BLTCY's sora middleware only accepts the literal "portrait"/"landscape"
+      // for aspect_ratio — passing "9:16"/"16:9" makes it inject an unknown
+      // `metadata` parameter to upstream OpenAI and the request 400s.
       payload = {
         ...providerOptions,
         prompt: params.prompt,
         model: model.slug,
-        aspect_ratio: toPortraitLandscapeAspectRatio(params.orientation),
+        aspect_ratio: params.orientation === "portrait" ? "portrait" : "landscape",
         duration: params.duration,
         ...(images.length > 0
           ? { input_reference: images.map((url) => ({ type: "image_url", image_url: url })) }
@@ -257,7 +228,7 @@ export const platoProvider: VideoProviderAdapter = {
       taskIds.push(taskId);
     }
 
-    return taskIds;
+    return { providerTaskIds: taskIds };
   },
   async queryTaskStatus({ model, taskId }) {
     const result = await apiRequest(

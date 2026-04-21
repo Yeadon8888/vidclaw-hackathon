@@ -37,13 +37,32 @@ export interface VideoModelRecord {
   sortOrder: Model["sortOrder"];
 }
 
+/**
+ * What an adapter returns from createTasks. The `immediateResults` parallel
+ * array lets synchronous providers (e.g. grok2api's chat-completions path)
+ * declare a slot as already SUCCESS at submission time — the inserter then
+ * writes the final URL straight to task_items, no polling required.
+ */
+export interface ProviderCreateResult {
+  providerTaskIds: string[];
+  /** Same length as providerTaskIds when set; null entries fall back to polling. */
+  immediateResults?: (TaskStatusResult | null)[];
+}
+
 export interface VideoProviderAdapter {
   id: string;
+  /**
+   * Set to false if the adapter wants the original user-uploaded reference
+   * image URLs handed through unchanged, with no resize/recompress in
+   * `image-prep`. Defaults to true. grok2api uses false because its
+   * multimodal chat path adheres better to the user's original image.
+   */
+  wantsImagePrep?: boolean;
   getCapabilities(model: VideoModelRecord): VideoProviderCapabilities;
   createTasks(args: {
     model: VideoModelRecord;
     params: VideoParams;
-  }): Promise<string[]>;
+  }): Promise<ProviderCreateResult>;
   queryTaskStatus(args: {
     model: VideoModelRecord;
     taskId: string;
@@ -322,6 +341,7 @@ export async function createVideoTasks(params: {
   userId?: string;
 }): Promise<{
   providerTaskIds: string[];
+  immediateResults?: (TaskStatusResult | null)[];
   resolvedParams: VideoParams;
 }> {
   const adapter = resolveVideoProvider(params.model.provider);
@@ -330,10 +350,16 @@ export async function createVideoTasks(params: {
     params.request,
   );
 
-  // Resize reference images to match target video dimensions.
-  // Some upstream models reject images whose pixel size differs
-  // from the requested output resolution.
-  if (params.userId && resolvedParams.imageUrls && resolvedParams.imageUrls.length > 0) {
+  // Resize reference images so they match the provider's expected output
+  // dimensions — opt-out via `adapter.wantsImagePrep = false` for providers
+  // (e.g. grok2api) that adhere better to the user's original image.
+  const wantsPrep = adapter.wantsImagePrep ?? true;
+  if (
+    wantsPrep &&
+    params.userId &&
+    resolvedParams.imageUrls &&
+    resolvedParams.imageUrls.length > 0
+  ) {
     const resolution =
       (resolvedParams.providerOptions?.resolution as string) ??
       (resolvedParams.providerOptions?.size as string) ??
@@ -341,18 +367,21 @@ export async function createVideoTasks(params: {
     resolvedParams.imageUrls = await prepareImagesForProvider({
       imageUrls: resolvedParams.imageUrls,
       orientation: resolvedParams.orientation,
-      modelSlug: params.model.slug,
       provider: params.model.provider,
       resolution,
       userId: params.userId,
     });
   }
 
-  const providerTaskIds = await adapter.createTasks({
+  const submitted = await adapter.createTasks({
     model: params.model,
     params: resolvedParams,
   });
-  return { providerTaskIds, resolvedParams };
+  return {
+    providerTaskIds: submitted.providerTaskIds,
+    immediateResults: submitted.immediateResults,
+    resolvedParams,
+  };
 }
 
 export async function createVideoTasksForModelId(params: {
@@ -362,6 +391,7 @@ export async function createVideoTasksForModelId(params: {
 }): Promise<{
   model: VideoModelRecord;
   providerTaskIds: string[];
+  immediateResults?: (TaskStatusResult | null)[];
   resolvedParams: VideoParams;
 }> {
   const model = await getVideoModelById(params.modelId);
