@@ -9,6 +9,38 @@ import {
   MODEL_CAPABILITIES,
 } from "@/lib/models/capabilities";
 
+/**
+ * GET /api/admin/models
+ *
+ * 列出所有模型。**绝不把 apiKey 原文返回给浏览器**——返回一个脱敏版本
+ * （头尾各 4 位，中间打码），再额外返回 `apiKeyConfigured` 布尔方便前端
+ * 判断"已配"状态。
+ *
+ * 脱敏规则和 PATCH 的占位识别（见 below）配合使用：前端显示 maskedKey，
+ * 如果用户不改动，PATCH 原样回传，后端识别后不更新 apiKey 列。
+ */
+const API_KEY_MASK_HEAD = 4;
+const API_KEY_MASK_TAIL = 4;
+const API_KEY_MASK_MIDDLE = "••••";
+
+function maskApiKey(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= API_KEY_MASK_HEAD + API_KEY_MASK_TAIL) {
+    return API_KEY_MASK_MIDDLE;
+  }
+  const head = trimmed.slice(0, API_KEY_MASK_HEAD);
+  const tail = trimmed.slice(-API_KEY_MASK_TAIL);
+  return `${head}${API_KEY_MASK_MIDDLE}${tail}`;
+}
+
+/** 判断 PATCH 请求里传回的 apiKey 是否只是我们吐出去的脱敏串。 */
+function isMaskedApiKey(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return value.includes(API_KEY_MASK_MIDDLE);
+}
+
 /** GET /api/admin/models — list all video models (admin only) */
 export async function GET() {
   const authResult = await requireAdmin();
@@ -19,7 +51,13 @@ export async function GET() {
     .from(models)
     .orderBy(asc(models.sortOrder));
 
-  return NextResponse.json({ models: rows });
+  const sanitized = rows.map((row) => ({
+    ...row,
+    apiKey: maskApiKey(row.apiKey),
+    apiKeyConfigured: Boolean(row.apiKey && row.apiKey.trim()),
+  }));
+
+  return NextResponse.json({ models: sanitized });
 }
 
 /** POST /api/admin/models — create a new model (admin only) */
@@ -67,7 +105,14 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  return NextResponse.json(created, { status: 201 });
+  return NextResponse.json(
+    {
+      ...created,
+      apiKey: maskApiKey(created.apiKey),
+      apiKeyConfigured: Boolean(created.apiKey && created.apiKey.trim()),
+    },
+    { status: 201 },
+  );
 }
 
 /** PATCH /api/admin/models — update a model (admin only) */
@@ -104,7 +149,18 @@ export async function PATCH(req: NextRequest) {
   if (body.capability !== undefined) updates.capability = body.capability;
   if (body.creditsPerGen !== undefined) updates.creditsPerGen = body.creditsPerGen;
   if (body.isActive !== undefined) updates.isActive = body.isActive;
-  if (body.apiKey !== undefined) updates.apiKey = body.apiKey || null;
+  if (body.apiKey !== undefined) {
+    // 若前端回传的是我们吐出去的脱敏串（说明用户没改），视为无变化，
+    // 不要拿脱敏串覆盖数据库里真实的 key。只有空字符串 → 清除，真实新 key
+    // → 覆盖。
+    if (isMaskedApiKey(body.apiKey)) {
+      // no-op
+    } else if (body.apiKey === "" || body.apiKey === null) {
+      updates.apiKey = null;
+    } else {
+      updates.apiKey = body.apiKey;
+    }
+  }
   if (body.baseUrl !== undefined) updates.baseUrl = body.baseUrl || null;
   if (body.defaultParams !== undefined) {
     updates.defaultParams = normalizeModelDefaultParams(body.defaultParams);
@@ -125,7 +181,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Model not found" }, { status: 404 });
   }
 
-  return NextResponse.json(updated);
+  return NextResponse.json({
+    ...updated,
+    apiKey: maskApiKey(updated.apiKey),
+    apiKeyConfigured: Boolean(updated.apiKey && updated.apiKey.trim()),
+  });
 }
 
 /** DELETE /api/admin/models — delete a model (admin only) */
