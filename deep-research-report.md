@@ -135,7 +135,9 @@ flowchart TD
 
 ## 详细问题
 
-**[FIXED 部分] 拆成两把 key：`UPLOAD_API_KEY` 供服务端 list/delete/upload 使用，`UPLOAD_CLIENT_KEY` 专供浏览器直传使用（需运维在网关侧新建只允许 `POST /upload` 的受限 key）。若未配置 `UPLOAD_CLIENT_KEY`，暂时回退到 `UPLOAD_API_KEY` 并每次打 warn 提醒。真正的彻底修法（网关签发签名 URL）需要改 Cloudflare Worker 侧代码，超出本仓库范围。**
+**[FIXED] 双 key 方案落地完整：(1) Cloudflare Worker (`vidclaw-upload-gateway`) 新增 `authorize()` 双 scope 鉴权——admin key 走 list/upload/delete，client key 只允许 POST /upload，list/delete 返 403；constant-time 比较。(2) Worker 端生成 40 字节随机 `UPLOAD_CLIENT_KEY` 通过 `wrangler secret put` 注入；Vercel production env 同步添加。(3) vidclaw-v2 侧 `/api/assets/upload-token` 优先读 `UPLOAD_CLIENT_KEY`，退化时走 admin key 打 warn 提醒运维。浏览器拿到的 key 只能 upload，admin key 不再出仓库。**
+**[附加] Vercel env `UPLOAD_API_KEY` 尾部 `\n` 字面量清理（`vercel env rm` + `--value` 重新注入 40 字节干净值）。**
+**[最终修法说明] 网关签发签名 URL 需要 Cloudflare Worker 侧继续改 `/sign-upload` 端点，下一批独立 spec 处理。当前双 key 方案已把浏览器侧的信任边界缩到最小。**
 
 **[严重度 P1] [src/app/api/assets/upload-token/route.ts:40] [问题] 浏览器直传接口把上传网关 `apiKey` 原样返回给客户端，导致上传主密钥暴露。**  
 `POST /api/assets/upload-token` 在生成 `uploadUrl` 后，直接返回 `{ uploadUrl, apiKey, key }`。与此同时，服务端 `storage/gateway.ts` 也是用同一个 `config.apiKey` 调用 `/list`、`/upload`、`/files/:key` 删除等接口。这意味着只要浏览器拿到该 key，用户就不再只具备“上传自己的一个对象”的能力，而是可能具备网关支持的更大能力范围。由于网关实现仓库不在本项目内，真实权限边界是**未指明**的；但就本仓库的调用方式看，这个 key 至少不是一次性、不是 scope-limited、也不是只写 token。fileciteturn42file0 fileciteturn24file0
@@ -417,7 +419,9 @@ export async function markStripeOrderPaid(event: Stripe.Event): Promise<boolean>
 }
 ```
 
-**[严重度 P2] [src/app/api/tasks/refresh/route.ts:17] [问题] “刷新任务列表”接口直接执行 `runTaskMaintenance()`，把读接口变成了带重副作用的编排入口，形成隐藏数据流耦合。**  
+**[FIXED] /api/tasks/refresh 彻底改为纯读接口，移除 `runTaskMaintenance()` 调用。任务推进统一由每分钟 pg_cron → /api/internal/tasks/tick 承担，浏览器访问频率不再等于调度频率。若将来需要"用户主动戳一下"能力，单独开 POST /api/tasks/:id/poll 并加节流，不再把副作用塞回读路径。**
+
+**[严重度 P2] [src/app/api/tasks/refresh/route.ts:17] [问题] "刷新任务列表"接口直接执行 `runTaskMaintenance()`，把读接口变成了带重副作用的编排入口，形成隐藏数据流耦合。**  
 从名字看，`GET /api/tasks/refresh` 像一个读接口；但实现上它会执行 scheduled 推进、batch 提交、active task polling、timeout 处理，然后再返回任务列表。架构上，这相当于把“用户打开任务页/手动刷新”的动作变成了“调度器的一部分”。它的后果不是简单的性能差，而是**系统行为随页面访问频率变化**：同一用户多开页面、多次刷新、前端重试，都可能额外触发维护写路径。`REVIEW_CONTEXT.md` 把 tick 视为分钟级维护入口，但当前 refresh 路由实际上已经成了第二个入口。fileciteturn26file0 fileciteturn63file0 fileciteturn0file0
 
 **[建议方案]**  
@@ -449,6 +453,10 @@ export async function GET() {
   return NextResponse.json({ tasks: userTasks, taskGroups: userTaskGroups });
 }
 ```
+
+**[FIXED 部分] 架构师决策拆成两半：**
+**[FIXED] Part A — 修 `delayStaggeredSubmission()` 的语义谎言。原实现不管 index 多少固定等 1s，并行 map 下根本没错峰。改成真正 `index * BATCH_SUBMISSION_STAGGER_MS`：第 0 个立即开始，第 N 个等 N*1s。**
+**[SKIPPED 原因] Part B — runner 全局并发 cap 不做。理由：当前活跃 task_group 通常 ≤5（生产数据支撑），Grok proxy 自带账号池排队，用户彼此解耦已通过 Promise.allSettled 实现。再加 semaphore 是创可贴；真正的架构解法是 pgmq + per-provider worker pool（已列入中期 queue 迁移 spec）。现在加了之后未来要重写，增加一次无必要改动。**
 
 **[严重度 P2] [src/lib/tasks/runner.ts:49] [问题] `runner.ts` 对所有 eligible group 一次性并发推进，而 `groupProcessLimit` 只是每组 limit；再叠加 `batch-queue.ts` 的错峰实现与注释不一致，容易在高并发下放大 provider / Gemini / DB 负载。**  
 `runner.ts` 先取最多 30 个 `task_groups`，然后用 `Promise.allSettled` 把所有 eligible group 一次性丢给 `processPendingBatchTasks()`；这里的 `groupLimit` 仅限制“每个 group 本次最多推进多少子任务”，并不限制“本次 tick 总共推进多少 group”。因此最坏情况下，本次 tick 会形成“30 个 group × 每组 3 个子任务”的并发放大。更糟的是，批量错峰函数 `delayStaggeredSubmission(index)` 的注释写的是“按 `index * STAGGER_MS` 错开”，实现却只对 `index > 0` 固定等待 1 秒；在并发 map 场景下，第二个、第三个、第四个任务会在几乎同一时间窗口内同时启动。`REVIEW_CONTEXT.md` 已把 300 秒预算、grok2api 同步阻塞和 batch-queue 常量列为高敏感区，这个问题与那份上下文完全一致。fileciteturn63file0 fileciteturn18file0 fileciteturn0file0 citeturn19search1turn19search2
@@ -518,6 +526,10 @@ export async function GET() {
 
 // PATCH/POST 只接受新 secret，不再把旧 secret 回显到前端
 ```
+
+**[FIXED] 新增 `drizzle/0013_enable_rls.sql`：10 张多租户表 (users/tasks/task_groups/task_items/task_slots/user_assets/credit_txns/payment_orders/asset_transform_jobs/gallery_items) 全部 ENABLE RLS + authenticated own-row SELECT 策略；4 张服务内部表 (models/system_config/announcements/stripe_events) ENABLE RLS 但无 authenticated 策略（authenticated 看不到任何行）。策略用 `(select auth.uid())` 单查询缓存写法；drop-if-exists + create 保证幂等。**
+**[零破坏性验证] 部署前已确认 DATABASE_URL 连接 role 为 `postgres` 且 `rolbypassrls=true`，加 RLS 后所有现有服务端查询照常 bypass，不改变任何运行时行为。迁移通过 Vercel build 步骤的 `drizzle-kit migrate` 自动应用到生产，生产 `drizzle.__drizzle_migrations` 账本可见。**
+**[防线意义] 一旦将来 (a) 从前端用 Supabase JS Client、(b) 写 Edge Function、(c) 接 Supabase MCP 供 AI 直查，RLS 是用户之间的唯一隔离屏障，现在先钉死避免将来变 P0。**
 
 **[严重度 P2] [drizzle/0000_green_starjammers.sql:1] [问题] 已检查 migration 中未见 `ENABLE ROW LEVEL SECURITY` 与 `CREATE POLICY`，Supabase RLS 完整性不足，当前数据隔离主要依赖应用代码而非数据库防线。**  
 从 `drizzle/0000` 到 `0012`，我检查到的是建表、类型与字段变更，但没有看到任何 `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` 或 `CREATE POLICY` 语句。与此同时，业务代码大多通过 `DATABASE_URL` 上的 Drizzle 直接读写数据库，而不是通过受 RLS 限制的前端查询路径。若当前部署从不把这些表暴露给 `anon/authenticated` API 角色，则这个问题主要表现为“缺少 defense in depth”；但一旦未来引入更多 Supabase 直连查询、外部工具、边缘函数或误暴露 API，数据库层将缺少最后一道按用户隔离的安全网。Supabase 官方文档建议对暴露 schema 的表启用 RLS，并说明 service/secret key 会绕过 RLS，不能把它当作“以后补也没关系”的装饰项。fileciteturn38file0 fileciteturn39file0 fileciteturn36file0 citeturn19search0turn21search0turn21search4turn21search10
