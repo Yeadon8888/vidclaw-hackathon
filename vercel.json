@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "buildCommand": "npm run build",
+  "buildCommand": "npx tsx scripts/vercel-build.ts",
   "regions": ["hkg1"],
   "functions": {
     "src/app/api/generate/route.ts": {
