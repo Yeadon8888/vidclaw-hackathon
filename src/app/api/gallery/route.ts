@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 import { galleryItems, tasks, users } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
 import type { ScriptResult } from "@/lib/video/types";
+import {
+  fetchAssetBuffer,
+  uploadVideo,
+  isUploadGatewayEnabled,
+} from "@/lib/storage/gateway";
 
 /**
  * GET /api/gallery — Public paginated gallery listing
@@ -93,13 +98,36 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Rehost the video to our own R2 so the gallery card doesn't depend on
+  // upstream provider CDNs (which may expire signed URLs or block hotlink).
+  // Thumbnail generation runs asynchronously via the cron backfill at
+  // /api/internal/gallery/thumbnail-backfill — it needs ffmpeg, so we don't
+  // block the publish path on it.
+  const upstreamUrl = task.resultUrls[0];
+  let finalVideoUrl = upstreamUrl;
+
+  if (isUploadGatewayEnabled()) {
+    try {
+      const fetched = await fetchAssetBuffer(upstreamUrl);
+      const stored = await uploadVideo({
+        userId: user.id,
+        filename: `gallery-${taskId.slice(0, 8)}.mp4`,
+        data: fetched.buffer,
+        contentType: fetched.mimeType.startsWith("video/") ? fetched.mimeType : "video/mp4",
+      });
+      finalVideoUrl = stored.url;
+    } catch (e) {
+      console.warn("[gallery] video rehost failed; falling back to upstream URL:", e instanceof Error ? e.message : e);
+    }
+  }
+
   const [item] = await db
     .insert(galleryItems)
     .values({
       taskId,
       userId: user.id,
       title,
-      videoUrl: task.resultUrls[0],
+      videoUrl: finalVideoUrl,
       prompt: task.soraPrompt,
       scriptJson: task.scriptJson,
       modelSlug: params?.model ?? null,
