@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "models": "模型",
+    "cases": "案例",
+    "pricing": "定价",
+    "gallery": "灵感广场",
+    "blog": "Blog",
+    "login": "登录",
+    "cta": "免费开始"
+  },
+  "hero": {
+    "badge": "8 大 AI 模型 · Sora 2 / VEO 3.1 / Seedance / Hailuo",
+    "titleLine1": "AI 电商",
+    "titleLine2": "视频生产工具",
+    "subtitle": "从视频生成、竞品拆解、商品组图到视频换人 — 一站式覆盖电商内容创作全链路。3 分钟出片，支持抖音、TikTok、小红书等平台。",
+    "primaryCta": "进入工作台",
+    "secondaryCta": "浏览灵感广场",
+    "trust": {
+      "refund": "失败自动退款",
+      "speed": "平均 3 分钟出片",
+      "lang": "支持 9 种语言"
+    }
+  },
+  "marquee": "聚合全球主流视频生成模型 · 一个账号全部调用",
+  "showcase": {
+    "title": "AI 生成的产品广告",
+    "subtitle": "不同品类、不同风格、不同平台"
+  },
+  "pricing": {
+    "title": "按量付费，不绑订阅",
+    "subtitle": "积分永不过期 · 失败自动退款 · 随时停用",
+    "popular": "最受欢迎",
+    "ctaBuy": "立即购买",
+    "ctaContact": "联系我们",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "price": "$9.9",
+        "unit": "一次性",
+        "credits": "700 积分",
+        "hint": "约 100 条视频",
+        "features": [
+          "8 大模型任选",
+          "失败自动退款",
+          "积分永不过期",
+          "标准队列"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "price": "$49",
+        "unit": "一次性",
+        "credits": "3500 积分",
+        "hint": "约 500 条视频 · 最划算",
+        "features": [
+          "Starter 全部",
+          "优先队列（快 40%）",
+          "批量并发（5 路同时）",
+          "API 接入 Beta"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "联系销售",
+        "unit": "",
+        "credits": "按量结算",
+        "hint": "独立实例 · 白标",
+        "features": [
+          "Pro 全部",
+          "独立结算通道",
+          "独立队列 + SLA",
+          "白标 / OEM 支持"
+        ]
+      }
+    }
+  },
+  "cases": {
+    "title": "真实客户的真实数据",
+    "subtitle": "不是 demo，不是 vanity metrics",
+    "case1": {
+      "name": "短视频带货团队",
+      "meta": "跨境电商团队 · 月利润 ¥900,000",
+      "desc": "月 90 万带货利润。把 VidClaw 当批量素材中台，一天生成 200+ 条视频供投手挑选，素材测试成本降 80%。"
+    },
+    "case2": {
+      "name": "马来西亚宠物品牌",
+      "meta": "DTC 品牌 · 独家合作",
+      "desc": "独家合作方。所有 TikTok / Lazada 投放素材全量交给 VidClaw 生产，单月跑 500+ 条 SKU，爆品率提升 3 倍。"
+    }
+  },
+  "faq": {
+    "title": "付费前想清楚这几件事",
+    "items": [
+      {
+        "q": "生成失败会退款吗？",
+        "a": "会，全额退回积分。任何因模型侧问题导致的失败（质量不达标、审核拒绝、超时），系统自动监测并退款，不需要你申请。"
+      },
+      {
+        "q": "积分有效期多久？",
+        "a": "永久有效。买了就是你的，不过期，不清零，不用急着用完。"
+      },
+      {
+        "q": "8 个模型怎么选？",
+        "a": "每个模型都在生成界面有效果预览和单条价格。通用场景推荐 Seedance 2.0（性价比），高端质感选 Sora 2 或 VEO 3.1，快速出量选 Hailuo 2.3。"
+      },
+      {
+        "q": "有企业方案吗？",
+        "a": "有。年付 75 折、独立结算、API 接入、独立队列优先级、白标支持。联系 sales@video.yeadon.top。"
+      },
+      {
+        "q": "支持哪些付款方式？",
+        "a": "Stripe 信用卡（Visa / MasterCard / American Express）、Apple Pay、Google Pay。中国大陆用户也可用支付宝。"
+      }
+    ]
+  },
+  "cta": {
+    "titleLine1": "今天开始，",
+    "titleLine2": "明天就有内容",
+    "subtitle": "无需拍摄团队，无需剪辑经验，AI 帮你搞定一切",
+    "button": "免费生成第一条视频"
+  },
+  "pricingPage": {
+    "title": "积分充值",
+    "subtitle": "选择适合你的套餐，开始 AI 视频创作",
+    "cnyHint": "≈ ¥{cny} 人民币（仅供参考，实际按 USD 收费）",
+    "perVideo": "≈ ${perVideo}/条视频",
+    "ctaBuy": "立即充值",
+    "ctaLoading": "正在跳转 Stripe...",
+    "ctaEnterprise": "联系我们",
+    "plans": {
+      "starter": {
+        "name": "入门版",
+        "features": [
+          "700 积分",
+          "约 35 条 Hailuo Fast / 14 条 Sora 2",
+          "全模型可用",
+          "积分永不过期"
+        ]
+      },
+      "pro": {
+        "name": "专业版",
+        "features": [
+          "3500 积分",
+          "约 175 条 Hailuo Fast / 70 条 Sora 2",
+          "全模型可用",
+          "积分永不过期",
+          "优先排队",
+          "自定义 Prompt"
+        ]
+      },
+      "enterprise": {
+        "name": "企业部署",
+        "customPrice": "定制方案",
+        "features": [
+          "无限积分",
+          "公式化爆款视频拆解",
+          "完形填空式内容生产",
+          "接入龙虾自动化数字员工",
+          "API 对接 & 私有化部署",
+          "专属客服 & 定制开发"
+        ]
+      }
+    },
+    "why": {
+      "title": "为什么选 VidClaw",
+      "items": [
+        "失败自动退款：模型侧任何问题系统监测自动退还积分",
+        "按需付费：不绑订阅，买一次用一次",
+        "8 大模型聚合：Sora 2 / VEO 3.1 / Seedance / Hailuo 等一个账号全搞定"
+      ]
+    },
+    "notices": {
+      "flow": "充值流程",
+      "flowDesc": "点击「立即充值」跳转 Stripe 完成付款，支付成功后积分自动到账。如需企业部署或定制方案，请使用「联系我们」扫码沟通。",
+      "enterprise": "企业部署 · 公式化爆款拆解",
+      "enterpriseDesc": "专业拆解爆款视频逻辑，用「完形填空」的方式做内容生产 —— 让爆款更有规律，内容创作跟喝水一样简单。接入龙虾自动化数字员工，实现视频规模化批量生产。"
+    },
+    "qr": {
+      "title": "企业咨询",
+      "subtitle": "扫码添加微信，详细沟通企业部署方案",
+      "hint": "添加好友后备注「企业咨询」，我们会尽快联系您",
+      "alt": "微信二维码"
+    },
+    "popular": "最受欢迎"
+  },
+  "footer": {
+    "tagline": "AI 电商视频生产工具 · 8 大顶级模型 · 3 分钟出片",
+    "product": "产品",
+    "resources": "资源",
+    "legal": "法务",
+    "links": {
+      "generate": "开始创作",
+      "analyze": "视频拆解",
+      "pricing": "定价",
+      "gallery": "灵感广场",
+      "blog": "Blog",
+      "terms": "服务条款",
+      "privacy": "隐私政策",
+      "refund": "退款政策"
+    },
+    "copyright": "© {year} VidClaw · AI 电商视频生产工具"
+  }
+}

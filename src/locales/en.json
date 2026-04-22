@@ -1,0 +1,203 @@
+{
+  "nav": {
+    "models": "Models",
+    "cases": "Cases",
+    "pricing": "Pricing",
+    "gallery": "Gallery",
+    "blog": "Blog",
+    "login": "Log in",
+    "cta": "Get started"
+  },
+  "hero": {
+    "badge": "8 AI models · Sora 2 / VEO 3.1 / Seedance / Hailuo",
+    "titleLine1": "Ship a winning ad",
+    "titleLine2": "every 3 minutes",
+    "subtitle": "From video generation and competitor analysis to product imagery and face-swap — one workflow for every ecommerce creative. 3-minute turnaround, optimized for TikTok, Reels, and Douyin.",
+    "primaryCta": "Open workspace",
+    "secondaryCta": "Browse gallery",
+    "trust": {
+      "refund": "Auto-refund on failure",
+      "speed": "3-minute average",
+      "lang": "9 languages supported"
+    }
+  },
+  "marquee": "Every major video model · one account",
+  "showcase": {
+    "title": "Ads made by AI",
+    "subtitle": "Different categories, styles, and platforms"
+  },
+  "pricing": {
+    "title": "Pay per use. No subscription.",
+    "subtitle": "Credits never expire · Auto-refund on failure · Cancel anytime",
+    "popular": "Most popular",
+    "ctaBuy": "Buy credits",
+    "ctaContact": "Contact sales",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "price": "$9.9",
+        "unit": "one-time",
+        "credits": "700 credits",
+        "hint": "~100 videos",
+        "features": [
+          "All 8 models",
+          "Auto-refund on failure",
+          "Credits never expire",
+          "Standard queue"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "price": "$49",
+        "unit": "one-time",
+        "credits": "3,500 credits",
+        "hint": "~500 videos · best value",
+        "features": [
+          "Everything in Starter",
+          "Priority queue (40% faster)",
+          "Batch concurrency (5 parallel)",
+          "API access (Beta)"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Contact sales",
+        "unit": "",
+        "credits": "Volume billing",
+        "hint": "Dedicated · white-label",
+        "features": [
+          "Everything in Pro",
+          "Dedicated billing",
+          "Dedicated queue + SLA",
+          "White-label / OEM"
+        ]
+      }
+    }
+  },
+  "cases": {
+    "title": "Real customers. Real numbers.",
+    "subtitle": "Not a demo. Not vanity metrics.",
+    "case1": {
+      "name": "Ecommerce content team",
+      "meta": "Cross-border ops · $130K/mo profit",
+      "desc": "$130K monthly net. VidClaw is their creative supply line — 200+ videos a day for media buyers to test-and-kill. Creative testing cost down 80%."
+    },
+    "case2": {
+      "name": "Malaysian pet brand",
+      "meta": "DTC brand · Exclusive partner",
+      "desc": "Exclusive partnership. Every TikTok Shop and Lazada creative runs through VidClaw. 500+ SKU videos a month. Winner rate 3×."
+    }
+  },
+  "faq": {
+    "title": "Answers before you spend a dollar",
+    "items": [
+      {
+        "q": "What if a video fails?",
+        "a": "Full credit refund, automatically. Any model-side failure (quality, policy rejection, timeout) is detected and refunded — no ticket needed."
+      },
+      {
+        "q": "Do credits expire?",
+        "a": "Never. Bought credits stay yours forever. No expiry, no burn-rate pressure."
+      },
+      {
+        "q": "Which of the 8 models should I pick?",
+        "a": "Every model shows sample output and per-video cost in the UI. General use: Seedance 2.0 (best value). Premium feel: Sora 2 or VEO 3.1. High volume: Hailuo 2.3."
+      },
+      {
+        "q": "Do you offer enterprise plans?",
+        "a": "Yes. 25% off annual, invoiced billing, API access, dedicated queue, white-label. Email sales@video.yeadon.top."
+      },
+      {
+        "q": "What payment methods do you accept?",
+        "a": "Stripe (Visa, Mastercard, Amex), Apple Pay, Google Pay. China mainland users: Alipay (CNY rail)."
+      }
+    ]
+  },
+  "cta": {
+    "titleLine1": "Start today.",
+    "titleLine2": "Ship tomorrow.",
+    "subtitle": "No film crew. No editing skills. AI handles the rest.",
+    "button": "Generate your first video free"
+  },
+  "pricingPage": {
+    "title": "Buy credits",
+    "subtitle": "Pick a pack and start shipping ads",
+    "cnyHint": "",
+    "perVideo": "≈ ${perVideo} per video",
+    "ctaBuy": "Buy now",
+    "ctaLoading": "Redirecting to Stripe...",
+    "ctaEnterprise": "Contact sales",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "features": [
+          "700 credits",
+          "~35 Hailuo Fast / 14 Sora 2 videos",
+          "All 8 models",
+          "Credits never expire"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "features": [
+          "3,500 credits",
+          "~175 Hailuo Fast / 70 Sora 2 videos",
+          "All 8 models",
+          "Credits never expire",
+          "Priority queue",
+          "Custom prompts"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "customPrice": "Custom",
+        "features": [
+          "Unlimited credits",
+          "Formula-based winner breakdown",
+          "Fill-in-the-blank content production",
+          "Lobster automation integration",
+          "API / on-prem deployment",
+          "Dedicated support & custom build"
+        ]
+      }
+    },
+    "why": {
+      "title": "Why VidClaw is worth it",
+      "items": [
+        "Auto-refund on failure — any model-side issue triggers an automatic credit refund",
+        "Pay per use — no subscription, buy once use once",
+        "8 models in one — Sora 2, VEO 3.1, Seedance, Hailuo and more, one account"
+      ]
+    },
+    "notices": {
+      "flow": "How checkout works",
+      "flowDesc": "Click 'Buy now' to checkout on Stripe. Credits land in your account automatically on success. For enterprise or custom deployment, use 'Contact sales'.",
+      "enterprise": "Enterprise · Formula-based winner playbook",
+      "enterpriseDesc": "Reverse-engineer viral videos into repeatable formulas. Produce content fill-in-the-blank style. Plug in Lobster automation agents for scale."
+    },
+    "qr": {
+      "title": "Enterprise inquiry",
+      "subtitle": "Scan to add on WeChat for a detailed discussion",
+      "hint": "Note 'Enterprise inquiry' when adding; we'll reply promptly",
+      "alt": "WeChat QR code"
+    },
+    "popular": "Most popular"
+  },
+  "footer": {
+    "tagline": "AI video engine for ecommerce · 8 top models · 3-minute delivery",
+    "product": "Product",
+    "resources": "Resources",
+    "legal": "Legal",
+    "links": {
+      "generate": "Start creating",
+      "analyze": "Video analyzer",
+      "pricing": "Pricing",
+      "gallery": "Gallery",
+      "blog": "Blog",
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "refund": "Refunds"
+    },
+    "copyright": "© {year} VidClaw · AI video engine for ecommerce"
+  }
+}

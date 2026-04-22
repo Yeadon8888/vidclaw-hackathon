@@ -58,6 +58,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/gallery") ||
+    pathname.startsWith("/landing-preview") ||
+    pathname.startsWith("/design") ||
     pathname.startsWith("/privacy") ||
     pathname.startsWith("/terms") ||
     pathname.startsWith("/refund") ||
