@@ -88,7 +88,7 @@ const DEFAULT_PACKAGES: CreditPackage[] = [
     amountFen: 7000, // ¥70 (1 积分 = ¥0.1, 含利润)
     amountUsdCents: 990, // $9.9 ≈ ¥70 at ~7.1 CNY/USD
     credits: 700,
-    expiresInDays: 180,
+    expiresInDays: 0, // 0 = never expires
     description: "首次体验、中小批量创作",
     type: "pack",
   },
@@ -98,7 +98,7 @@ const DEFAULT_PACKAGES: CreditPackage[] = [
     amountFen: 34900, // ¥349
     amountUsdCents: 4900, // $49
     credits: 3500,
-    expiresInDays: 180,
+    expiresInDays: 0, // 0 = never expires
     badge: "最受欢迎",
     description: "高频跑批、日常商用",
     type: "pack",
@@ -162,7 +162,7 @@ function normalizePackages(input: unknown): CreditPackage[] {
         Number.isInteger(item.credits) &&
         item.credits > 0 &&
         Number.isInteger(item.expiresInDays) &&
-        item.expiresInDays > 0
+        item.expiresInDays >= 0
       );
     });
 }
