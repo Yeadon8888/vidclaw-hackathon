@@ -76,7 +76,11 @@ export async function yunwuImagesEditRequest(params: {
         Accept: "application/json",
       },
       body: form,
-      signal: AbortSignal.timeout(300_000),
+      // Per-image 120s. gpt-image-1 typically returns in ~50s; if we hit
+      // 120s the upstream is stuck (observed hanging indefinitely on
+      // slugs like gpt-image-2-all). Fail fast so one stuck image doesn't
+      // consume the scene route's whole 300s budget.
+      signal: AbortSignal.timeout(120_000),
     }),
   );
 
