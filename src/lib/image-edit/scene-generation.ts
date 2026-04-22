@@ -9,6 +9,10 @@ import { MODEL_CAPABILITIES } from "@/lib/models/capabilities";
 import { getActiveModelByCapability } from "@/lib/models/repository";
 import type { Model } from "@/lib/db/schema";
 import { bltcyImageRequest } from "@/lib/image-edit/bltcy";
+import {
+  isOpenAiImagesEditModel,
+  yunwuImagesEditRequest,
+} from "@/lib/image-edit/yunwu-gpt-image";
 
 export type SceneStyle =
   | "lifestyle"
@@ -56,11 +60,17 @@ export async function generateProductSceneImage(params: {
     SCENE_PROMPTS[params.style] ||
     SCENE_PROMPTS.lifestyle;
 
-  const imageUrl = await bltcyImageRequest({
-    assetUrl: params.assetUrl,
-    prompt,
-    model,
-  });
+  const imageUrl = isOpenAiImagesEditModel(model)
+    ? await yunwuImagesEditRequest({
+        assetUrl: params.assetUrl,
+        prompt,
+        model,
+      })
+    : await bltcyImageRequest({
+        assetUrl: params.assetUrl,
+        prompt,
+        model,
+      });
 
   return { model, imageUrl };
 }

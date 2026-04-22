@@ -16,6 +16,13 @@ interface GeneratedImage {
   assetId: string;
 }
 
+interface ModelOption {
+  id: string;
+  slug: string;
+  name: string;
+  creditsPerGen: number;
+}
+
 const STYLES: { value: SceneStyle; label: string; emoji: string }[] = [
   { value: "lifestyle", label: "生活场景", emoji: "🏠" },
   { value: "model", label: "模特展示", emoji: "👤" },
@@ -31,12 +38,14 @@ export default function ScenePage() {
   const [selectedStyles, setSelectedStyles] = useState<Set<SceneStyle>>(
     new Set(["lifestyle", "model", "studio"]),
   );
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [selectedModelSlug, setSelectedModelSlug] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState("");
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
 
-  // Load user assets
+  // Load user assets + image-edit models
   useEffect(() => {
     async function loadAssets() {
       try {
@@ -46,8 +55,23 @@ export default function ScenePage() {
         if (data.assets) setAssets(data.assets);
       } catch {}
     }
+    async function loadModels() {
+      try {
+        const res = await fetch("/api/models/image-edit");
+        if (!res.ok) return;
+        const data = (await res.json()) as { models: ModelOption[] };
+        setModels(data.models);
+        if (data.models.length > 0) {
+          setSelectedModelSlug((prev) => prev ?? data.models[0].slug);
+        }
+      } catch {}
+    }
     loadAssets();
+    loadModels();
   }, []);
+
+  const selectedModel =
+    models.find((m) => m.slug === selectedModelSlug) ?? models[0] ?? null;
 
   function toggleStyle(style: SceneStyle) {
     setSelectedStyles((prev) => {
@@ -72,6 +96,7 @@ export default function ScenePage() {
         body: JSON.stringify({
           assetId: selectedAssetId,
           styles: Array.from(selectedStyles),
+          modelSlug: selectedModelSlug ?? undefined,
         }),
       });
 
@@ -120,7 +145,8 @@ export default function ScenePage() {
   }
 
   const selectedAsset = assets.find((a) => a.id === selectedAssetId);
-  const totalCost = selectedStyles.size * 3; // approximate, model.creditsPerGen
+  const perImageCost = selectedModel?.creditsPerGen ?? 3;
+  const totalCost = selectedStyles.size * perImageCost;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-8">
@@ -175,10 +201,51 @@ export default function ScenePage() {
             )}
           </div>
 
-          {/* Step 2: Select styles */}
+          {/* Step 2: Select model */}
           <div className="rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] p-5">
             <h3 className="mb-3 text-sm font-semibold text-white">
-              ② 选择场景风格{" "}
+              ② 选择图片模型{" "}
+              <span className="font-normal text-slate-400">
+                （影响单张价格）
+              </span>
+            </h3>
+            {models.length === 0 ? (
+              <p className="text-sm text-slate-500">暂无可用图片模型。</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {models.map((m) => {
+                  const active = selectedModelSlug === m.slug;
+                  return (
+                    <button
+                      key={m.slug}
+                      onClick={() => setSelectedModelSlug(m.slug)}
+                      className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-all ${
+                        active
+                          ? "border-[var(--vc-accent)] bg-[var(--vc-accent)]/10 text-white"
+                          : "border-[var(--vc-border)] text-slate-400 hover:border-white/20 hover:text-white"
+                      }`}
+                    >
+                      <span className="truncate">{m.name}</span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          active
+                            ? "bg-[var(--vc-accent)]/20 text-[var(--vc-accent)]"
+                            : "bg-white/5 text-slate-500"
+                        }`}
+                      >
+                        {m.creditsPerGen} 积分/张
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Step 3: Select styles */}
+          <div className="rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] p-5">
+            <h3 className="mb-3 text-sm font-semibold text-white">
+              ③ 选择场景风格{" "}
               <span className="font-normal text-slate-400">
                 （已选 {selectedStyles.size} 种）
               </span>

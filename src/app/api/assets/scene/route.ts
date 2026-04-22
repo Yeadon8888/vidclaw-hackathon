@@ -34,9 +34,10 @@ export async function POST(req: NextRequest) {
     assetId: string;
     styles: SceneStyle[];
     customPrompt?: string;
+    modelSlug?: string;
   };
 
-  const { assetId, styles, customPrompt } = body;
+  const { assetId, styles, customPrompt, modelSlug } = body;
 
   if (!assetId) {
     return NextResponse.json({ error: "请选择一张产品图。" }, { status: 400 });
@@ -65,9 +66,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "产品图不存在。" }, { status: 404 });
   }
 
-  // Get model & check credits
+  // Get model & check credits (user-picked slug if provided, else default)
   const model = await getActiveModelByCapability({
     capability: MODEL_CAPABILITIES.imageEdit,
+    slug: modelSlug?.trim() || null,
   });
   const totalCost = model.creditsPerGen * validStyles.length;
 
