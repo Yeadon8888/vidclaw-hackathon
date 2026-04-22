@@ -157,7 +157,8 @@ export async function POST(req: NextRequest) {
     .returning();
 
   // Invalidate the public list cache so the new item shows up immediately.
-  revalidateTag("gallery");
+  // Next 16 requires the profile arg; "max" = expire next request.
+  revalidateTag("gallery", "max");
 
   return NextResponse.json({ ok: true, id: item.id });
 }
