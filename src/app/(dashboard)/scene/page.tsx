@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ImageIcon, Loader2, Check, Sparkles, Download } from "lucide-react";
-import type { SceneStyle } from "@/lib/image-edit/scene-generation";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Loader2,
+  Check,
+  Sparkles,
+  Download,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import type {
+  SceneStyle,
+  SceneRegion,
+  ScenePromptLanguage,
+} from "@/lib/image-edit/scene-generation";
 
 interface AssetOption {
   id: string;
@@ -32,6 +43,21 @@ const STYLES: { value: SceneStyle; label: string; emoji: string }[] = [
   { value: "studio", label: "棚拍风格", emoji: "📸" },
 ];
 
+const REGIONS: { value: SceneRegion; label: string }[] = [
+  { value: "auto", label: "自动" },
+  { value: "western", label: "欧美" },
+  { value: "east_asian_non_cn", label: "日韩" },
+  { value: "southeast_asian", label: "东南亚" },
+  { value: "malaysian", label: "马来西亚" },
+  { value: "mexican", label: "墨西哥" },
+  { value: "middle_east", label: "中东" },
+];
+
+const LANGUAGES: { value: ScenePromptLanguage; label: string }[] = [
+  { value: "zh", label: "中文" },
+  { value: "en", label: "English" },
+];
+
 export default function ScenePage() {
   const [assets, setAssets] = useState<AssetOption[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -40,6 +66,11 @@ export default function ScenePage() {
   );
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModelSlug, setSelectedModelSlug] = useState<string | null>(null);
+  const [region, setRegion] = useState<SceneRegion>("auto");
+  const [language, setLanguage] = useState<ScenePromptLanguage>("zh");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customPromptOpen, setCustomPromptOpen] = useState(false);
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState("");
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -73,6 +104,16 @@ export default function ScenePage() {
   const selectedModel =
     models.find((m) => m.slug === selectedModelSlug) ?? models[0] ?? null;
 
+  const selectedAsset = useMemo(
+    () => assets.find((a) => a.id === selectedAssetId) ?? null,
+    [assets, selectedAssetId],
+  );
+
+  // Auto-expand the picker only when very few images; otherwise keep it collapsed
+  // by default so the page doesn't get buried under a huge thumbnail grid.
+  const shouldAutoExpandAssets = assets.length > 0 && assets.length <= 4;
+  const isAssetPickerExpanded = assetPickerOpen || shouldAutoExpandAssets;
+
   function toggleStyle(style: SceneStyle) {
     setSelectedStyles((prev) => {
       const next = new Set(prev);
@@ -97,6 +138,9 @@ export default function ScenePage() {
           assetId: selectedAssetId,
           styles: Array.from(selectedStyles),
           modelSlug: selectedModelSlug ?? undefined,
+          region,
+          language,
+          customPrompt: customPrompt.trim() || undefined,
         }),
       });
 
@@ -144,7 +188,6 @@ export default function ScenePage() {
     }
   }
 
-  const selectedAsset = assets.find((a) => a.id === selectedAssetId);
   const perImageCost = selectedModel?.creditsPerGen ?? 3;
   const totalCost = selectedStyles.size * perImageCost;
 
@@ -160,44 +203,79 @@ export default function ScenePage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Left: Config */}
         <div className="space-y-5">
-          {/* Step 1: Select asset */}
+          {/* Step 1: Select asset — collapsible */}
           <div className="rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] p-5">
-            <h3 className="mb-3 text-sm font-semibold text-white">
-              ① 选择产品图
-            </h3>
+            <button
+              type="button"
+              onClick={() => setAssetPickerOpen((v) => !v)}
+              disabled={shouldAutoExpandAssets || assets.length === 0}
+              className="flex w-full items-center justify-between text-left disabled:cursor-default"
+            >
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  ① 选择产品图
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {assets.length === 0
+                    ? "暂无产品图"
+                    : selectedAssetId
+                      ? `已选 1 张 / 共 ${assets.length} 张`
+                      : `共 ${assets.length} 张 · 未选`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Collapsed preview thumbnail */}
+                {!isAssetPickerExpanded && selectedAsset && (
+                  <div
+                    className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-white/10 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${selectedAsset.url})` }}
+                  />
+                )}
+                {!shouldAutoExpandAssets && assets.length > 0 && (
+                  isAssetPickerExpanded ? (
+                    <ChevronUp className="h-4 w-4 text-slate-500" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-slate-500" />
+                  )
+                )}
+              </div>
+            </button>
+
             {assets.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                暂无产品图，请先去{" "}
+              <p className="mt-3 text-sm text-slate-500">
+                请先去{" "}
                 <a href="/assets" className="text-[var(--vc-accent)]">
                   素材库
                 </a>{" "}
                 上传。
               </p>
             ) : (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                {assets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    onClick={() => setSelectedAssetId(asset.id)}
-                    className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
-                      selectedAssetId === asset.id
-                        ? "border-[var(--vc-accent)] ring-2 ring-[var(--vc-accent)]/30"
-                        : "border-transparent hover:border-white/20"
-                    }`}
-                  >
-                    <img
-                      src={asset.url}
-                      alt={asset.filename ?? ""}
-                      className="h-full w-full object-cover"
-                    />
-                    {selectedAssetId === asset.id && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-[var(--vc-accent)]/20">
-                        <Check className="h-5 w-5 text-[var(--vc-accent)]" />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
+              isAssetPickerExpanded && (
+                <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                  {assets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      onClick={() => setSelectedAssetId(asset.id)}
+                      className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
+                        selectedAssetId === asset.id
+                          ? "border-[var(--vc-accent)] ring-2 ring-[var(--vc-accent)]/30"
+                          : "border-transparent hover:border-white/20"
+                      }`}
+                    >
+                      <img
+                        src={asset.url}
+                        alt={asset.filename ?? ""}
+                        className="h-full w-full object-cover"
+                      />
+                      {selectedAssetId === asset.id && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--vc-accent)]/20">
+                          <Check className="h-5 w-5 text-[var(--vc-accent)]" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )
             )}
           </div>
 
@@ -270,6 +348,95 @@ export default function ScenePage() {
                 );
               })}
             </div>
+          </div>
+
+          {/* Step 4: Region & language */}
+          <div className="rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] p-5">
+            <h3 className="mb-1 text-sm font-semibold text-white">
+              ④ 人物地区 & Prompt 语言
+            </h3>
+            <p className="mb-3 text-xs text-slate-500">
+              地区影响含人物的风格（生活/模特/户外）；语言切换影响模型理解 prompt 的稳定度，GPT Image 2 推荐 English。
+            </p>
+
+            <div className="mb-3">
+              <div className="mb-1.5 text-xs text-slate-400">人物地区</div>
+              <div className="flex flex-wrap gap-1.5">
+                {REGIONS.map((r) => {
+                  const active = region === r.value;
+                  return (
+                    <button
+                      key={r.value}
+                      onClick={() => setRegion(r.value)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-all ${
+                        active
+                          ? "border-[var(--vc-accent)] bg-[var(--vc-accent)]/10 text-[var(--vc-accent)]"
+                          : "border-[var(--vc-border)] text-slate-400 hover:border-white/20 hover:text-white"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1.5 text-xs text-slate-400">Prompt 语言</div>
+              <div className="flex gap-1.5">
+                {LANGUAGES.map((l) => {
+                  const active = language === l.value;
+                  return (
+                    <button
+                      key={l.value}
+                      onClick={() => setLanguage(l.value)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-all ${
+                        active
+                          ? "border-[var(--vc-accent)] bg-[var(--vc-accent)]/10 text-[var(--vc-accent)]"
+                          : "border-[var(--vc-border)] text-slate-400 hover:border-white/20 hover:text-white"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Step 5: Custom prompt — collapsible, default closed */}
+          <div className="rounded-xl border border-[var(--vc-border)] bg-[var(--vc-bg-surface)] p-5">
+            <button
+              type="button"
+              onClick={() => setCustomPromptOpen((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  ⑤ 自定义补充指令{" "}
+                  <span className="font-normal text-slate-500">（可选）</span>
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {customPrompt.trim()
+                    ? `已启用 · 会附加到每种风格的 prompt 末尾`
+                    : "展开可以为所有风格追加一条统一指令"}
+                </p>
+              </div>
+              {customPromptOpen ? (
+                <ChevronUp className="h-4 w-4 text-slate-500" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-slate-500" />
+              )}
+            </button>
+            {customPromptOpen && (
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                rows={4}
+                placeholder="例：强调夏季地中海度假氛围；暖色调；avoid cluttered props"
+                className="mt-3 w-full rounded-lg border border-[var(--vc-border)] bg-black/20 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-[var(--vc-accent)] focus:outline-none"
+              />
+            )}
           </div>
 
           {/* Generate button */}

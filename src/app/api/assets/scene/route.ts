@@ -3,7 +3,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userAssets, users, creditTxns, tasks } from "@/lib/db/schema";
-import { generateProductSceneImage, type SceneStyle } from "@/lib/image-edit/scene-generation";
+import {
+  generateProductSceneImage,
+  type SceneStyle,
+  type SceneRegion,
+  type ScenePromptLanguage,
+} from "@/lib/image-edit/scene-generation";
 import { getActiveModelByCapability } from "@/lib/models/repository";
 import { MODEL_CAPABILITIES } from "@/lib/models/capabilities";
 import { uploadAsset } from "@/lib/storage/gateway";
@@ -20,6 +25,18 @@ const VALID_STYLES = new Set<SceneStyle>([
   "studio",
 ]);
 
+const VALID_REGIONS = new Set<SceneRegion>([
+  "auto",
+  "western",
+  "east_asian_non_cn",
+  "southeast_asian",
+  "malaysian",
+  "mexican",
+  "middle_east",
+]);
+
+const VALID_LANGUAGES = new Set<ScenePromptLanguage>(["zh", "en"]);
+
 /**
  * POST /api/assets/scene — Generate scene images for a product
  * Body: { assetId: string, styles: SceneStyle[], customPrompt?: string }
@@ -35,9 +52,19 @@ export async function POST(req: NextRequest) {
     styles: SceneStyle[];
     customPrompt?: string;
     modelSlug?: string;
+    region?: SceneRegion;
+    language?: ScenePromptLanguage;
   };
 
   const { assetId, styles, customPrompt, modelSlug } = body;
+  const region: SceneRegion = VALID_REGIONS.has(body.region as SceneRegion)
+    ? (body.region as SceneRegion)
+    : "auto";
+  const language: ScenePromptLanguage = VALID_LANGUAGES.has(
+    body.language as ScenePromptLanguage,
+  )
+    ? (body.language as ScenePromptLanguage)
+    : "zh";
 
   if (!assetId) {
     return NextResponse.json({ error: "请选择一张产品图。" }, { status: 400 });
@@ -114,6 +141,8 @@ export async function POST(req: NextRequest) {
             assetUrl: asset.url,
             style,
             customPrompt,
+            region,
+            language,
             model,
           });
 
