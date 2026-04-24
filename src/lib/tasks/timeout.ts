@@ -12,7 +12,9 @@ import {
   expireDeadlineSlots,
   getActiveProviderTaskIds,
   maybeFinalizeFulfillmentTask,
+  reconcileSuccessfulSlotItems,
 } from "@/lib/tasks/fulfillment";
+import { recoverStuckGrokBatchTasks } from "@/lib/tasks/grok-recovery";
 
 export const TIMEOUT_MINUTES = 60;
 
@@ -23,6 +25,13 @@ export async function processTimedOutTasks(options?: {
   const now = new Date();
   const cutoff = new Date(now.getTime() - TIMEOUT_MINUTES * 60 * 1000);
   const limit = options?.limit ?? 50;
+
+  await recoverStuckGrokBatchTasks({
+    userId: options?.userId,
+    limit,
+    now,
+    submitSlots: false,
+  });
 
   // 用 started_at 优先判定"是否真的在跑了超过 TIMEOUT_MINUTES"；
   // 对于定时/延迟任务，created_at 可能远早于真正开始，避免误判。
@@ -162,6 +171,8 @@ export async function processTimedOutTasks(options?: {
   }
 
   for (const task of fulfillmentTasks) {
+    await reconcileSuccessfulSlotItems(task.id);
+
     const activeItems = await getActiveProviderTaskIds(task.id);
     for (const { providerTaskId, slotId, itemId } of activeItems) {
       try {
@@ -209,6 +220,7 @@ export async function processTimedOutTasks(options?: {
     }
 
     if (task.deliveryDeadlineAt) {
+      await reconcileSuccessfulSlotItems(task.id);
       await expireDeadlineSlots(task.id, task.deliveryDeadlineAt);
     }
 

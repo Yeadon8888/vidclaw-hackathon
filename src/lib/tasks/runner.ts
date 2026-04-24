@@ -14,9 +14,12 @@ import {
   advanceSlotOnResult,
   expireDeadlineSlots,
   getActiveProviderTaskIds,
+  maybeFinalizeFulfillmentTask,
+  reconcileSuccessfulSlotItems,
   refillPendingSlotsIfCapacityAvailable,
 } from "@/lib/tasks/fulfillment";
 import { processTimedOutTasks } from "@/lib/tasks/timeout";
+import { recoverStuckGrokBatchTasks } from "@/lib/tasks/grok-recovery";
 
 export async function runTaskMaintenance(options?: {
   userId?: string;
@@ -69,6 +72,11 @@ export async function runTaskMaintenance(options?: {
   }
   const processedGroups = groupResults.filter((r) => r.status === "fulfilled").length;
 
+  await recoverStuckGrokBatchTasks({
+    userId: options?.userId,
+    limit: options?.activeTaskLimit ?? 30,
+  });
+
   const taskConditions = options?.userId
     ? [eq(tasks.userId, options.userId)]
     : [];
@@ -87,6 +95,9 @@ export async function runTaskMaintenance(options?: {
 
   for (const task of activeTasks) {
     if (task.fulfillmentMode === "backfill_until_target") {
+      await reconcileSuccessfulSlotItems(task.id);
+      await maybeFinalizeFulfillmentTask(task);
+
       if (task.deliveryDeadlineAt) {
         await expireDeadlineSlots(task.id, task.deliveryDeadlineAt);
       }

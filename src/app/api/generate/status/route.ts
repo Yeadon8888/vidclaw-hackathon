@@ -13,6 +13,8 @@ import {
   expireDeadlineSlots,
   getActiveProviderTaskIds,
   getFulfillmentProgress,
+  maybeFinalizeFulfillmentTask,
+  reconcileSuccessfulSlotItems,
 } from "@/lib/tasks/fulfillment";
 
 /**
@@ -173,6 +175,9 @@ async function handleFulfillmentPoll(dbTaskId: string, userId: string) {
   if (!task) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
+
+  await reconcileSuccessfulSlotItems(dbTaskId);
+  await maybeFinalizeFulfillmentTask(task);
 
   // Expire deadline-overdue slots first
   if (task.deliveryDeadlineAt) {

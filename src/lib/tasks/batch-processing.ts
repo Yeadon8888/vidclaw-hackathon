@@ -1,15 +1,16 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { taskGroups, taskItems, taskSlots, tasks } from "@/lib/db/schema";
-import type { TaskParamsSnapshot } from "@/lib/video/types";
+import type { FulfillmentMode, TaskParamsSnapshot } from "@/lib/video/types";
 import { fetchAssetBuffer, loadUserPrompts } from "@/lib/storage/gateway";
 import { generateCopy, generateScript } from "@/lib/gemini";
 import { buildFinalVideoPrompt } from "@/lib/video/prompt";
 import { failTaskAndRefund } from "@/lib/tasks/reconciliation";
 import { recomputeTaskGroupSummary } from "@/lib/tasks/groups";
 import { resolveBatchUnitsPerProduct } from "@/lib/tasks/batch-math";
-import { createVideoTasksForModelId } from "@/lib/video/service";
+import { createVideoTasksForModelId, getVideoModelById } from "@/lib/video/service";
 import { initializeSlots, submitPendingSlots } from "@/lib/tasks/fulfillment";
+import { computeDeliveryDeadline } from "@/lib/tasks/retry-policy";
 import { insertTaskItemsFromSubmission } from "@/lib/tasks/items";
 import {
   delayStaggeredSubmission,
@@ -20,6 +21,17 @@ import {
 
 export function resolveBatchTaskVideoCount(taskParams: TaskParamsSnapshot): number {
   return resolveBatchUnitsPerProduct(taskParams);
+}
+
+export function resolveBatchTaskFulfillmentMode(
+  task: { taskGroupId: string | null; fulfillmentMode: FulfillmentMode },
+  model: { provider: string } | null | undefined,
+): FulfillmentMode {
+  if (task.taskGroupId && model?.provider === "grok2api") {
+    return "backfill_until_target";
+  }
+
+  return task.fulfillmentMode;
 }
 
 export async function processPendingBatchTasks(params: {
@@ -132,17 +144,37 @@ export async function processPendingBatchTasks(params: {
           outputLanguage: taskParams.outputLanguage,
         });
 
+        const model = await getVideoModelById(claimedTask.modelId);
+        const effectiveFulfillmentMode = resolveBatchTaskFulfillmentMode(
+          {
+            taskGroupId: claimedTask.taskGroupId,
+            fulfillmentMode: claimedTask.fulfillmentMode,
+          },
+          model,
+        );
+        const requestedCount = resolveBatchTaskVideoCount(taskParams);
+        const deliveryDeadlineAt = claimedTask.deliveryDeadlineAt ?? computeDeliveryDeadline(new Date());
+
         await db
           .update(tasks)
           .set({
             status: "generating",
             soraPrompt,
             scriptJson: scriptResult,
+            fulfillmentMode: effectiveFulfillmentMode,
+            requestedCount:
+              effectiveFulfillmentMode === "backfill_until_target"
+                ? requestedCount
+                : claimedTask.requestedCount,
+            deliveryDeadlineAt:
+              effectiveFulfillmentMode === "backfill_until_target"
+                ? deliveryDeadlineAt
+                : claimedTask.deliveryDeadlineAt,
           })
           .where(eq(tasks.id, claimedTask.id));
 
-        if (claimedTask.fulfillmentMode === "backfill_until_target") {
-          await initializeSlots(claimedTask.id, resolveBatchTaskVideoCount(taskParams));
+        if (effectiveFulfillmentMode === "backfill_until_target") {
+          await initializeSlots(claimedTask.id, requestedCount);
           const activeSlots = await db
             .select({ id: taskSlots.id })
             .from(taskSlots)
@@ -155,19 +187,18 @@ export async function processPendingBatchTasks(params: {
           const slotSubmissionLimit = resolveRemainingSubmissionCapacity({
             activeCount: activeSlots.length,
             maxConcurrent: getMaxBatchSlotSubmissionsPerTick(),
-            requestedCount: resolveBatchTaskVideoCount(taskParams),
+            requestedCount,
           });
-          const providerTaskIds = await submitPendingSlots({
-            id: claimedTask.id,
-            userId: claimedTask.userId,
-            modelId: claimedTask.modelId,
-            soraPrompt,
-            paramsJson: claimedTask.paramsJson,
-          }, { limit: slotSubmissionLimit });
-
-          if (providerTaskIds.length === 0) {
-            throw new Error("批量任务提交失败，未成功创建任何 provider 子任务。");
-          }
+          await submitPendingSlots(
+            {
+              id: claimedTask.id,
+              userId: claimedTask.userId,
+              modelId: claimedTask.modelId,
+              soraPrompt,
+              paramsJson: claimedTask.paramsJson,
+            },
+            { limit: slotSubmissionLimit },
+          );
         } else {
           const submitted = await createVideoTasksForModelId({
             modelId: claimedTask.modelId,
@@ -176,7 +207,7 @@ export async function processPendingBatchTasks(params: {
               imageUrls: [imageUrl],
               orientation: taskParams.orientation,
               duration: taskParams.duration,
-              count: resolveBatchTaskVideoCount(taskParams),
+              count: requestedCount,
               model: taskParams.model,
             },
             userId: claimedTask.userId,

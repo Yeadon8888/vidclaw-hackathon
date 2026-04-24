@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveBatchTaskVideoCount } from "../../../src/lib/tasks/batch-processing";
+import {
+  resolveBatchTaskFulfillmentMode,
+  resolveBatchTaskVideoCount,
+} from "../../../src/lib/tasks/batch-processing";
 import {
   computeBatchTotalVideoCount,
   normalizeBatchUnitsPerProduct,
@@ -62,4 +65,24 @@ test("computeBatchTotalVideoCount uses product count and units per product as th
 test("batch processing refunds even if submission failure happens after task enters generating", () => {
   assert.ok(ACTIVE_TASK_STATUSES.includes("generating"));
   assert.ok(ACTIVE_TASK_STATUSES.includes("polling"));
+});
+
+test("grok batch child tasks are forced through slot fulfillment", () => {
+  assert.equal(
+    resolveBatchTaskFulfillmentMode(
+      { taskGroupId: "group-1", fulfillmentMode: "standard" },
+      { provider: "grok2api" },
+    ),
+    "backfill_until_target",
+  );
+});
+
+test("non-grok batch child tasks keep their configured fulfillment mode", () => {
+  assert.equal(
+    resolveBatchTaskFulfillmentMode(
+      { taskGroupId: "group-1", fulfillmentMode: "standard" },
+      { provider: "plato" },
+    ),
+    "standard",
+  );
 });

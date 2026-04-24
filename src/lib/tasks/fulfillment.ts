@@ -9,7 +9,7 @@
  *   - Finalize the parent task when all slots are terminal
  */
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   creditTxns,
@@ -25,10 +25,7 @@ import {
   delayStaggeredSubmission,
   getMaxBatchSlotSubmissionsPerTick,
 } from "@/lib/tasks/batch-queue";
-import {
-  computeDeliveryDeadline,
-  shouldRetrySlot,
-} from "@/lib/tasks/retry-policy";
+import { shouldRetrySlot } from "@/lib/tasks/retry-policy";
 import { recomputeTaskGroupSummary } from "@/lib/tasks/groups";
 import { persistGeneratedVideos } from "@/lib/tasks/result-assets";
 import type { VideoDuration } from "@/lib/video/types";
@@ -43,12 +40,104 @@ export async function initializeSlots(
   taskId: string,
   count: number,
 ): Promise<TaskSlot[]> {
+  const existingSlots = await db
+    .select()
+    .from(taskSlots)
+    .where(eq(taskSlots.taskId, taskId));
+
+  if (existingSlots.length > 0) return existingSlots;
+
   const values = Array.from({ length: count }, (_, i) => ({
     taskId,
     slotIndex: i,
   }));
 
   return db.insert(taskSlots).values(values).returning();
+}
+
+export function resolveSubmittedSlotSuccessReconciliation(
+  slot: Pick<TaskSlot, "id" | "status">,
+  item: Pick<
+    typeof taskItems.$inferSelect,
+    "id" | "slotId" | "status" | "resultUrl"
+  >,
+): { status: "success"; resultUrl: string; winnerItemId: string } | null {
+  if (slot.status !== "submitted" && slot.status !== "pending") return null;
+  if (item.slotId !== slot.id) return null;
+  if (item.status !== "SUCCESS" || !item.resultUrl) return null;
+
+  return {
+    status: "success",
+    resultUrl: item.resultUrl,
+    winnerItemId: item.id,
+  };
+}
+
+export async function reconcileSuccessfulSlotItems(taskId: string): Promise<number> {
+  const rows = await db
+    .select({
+      slotId: taskSlots.id,
+      slotStatus: taskSlots.status,
+      itemId: taskItems.id,
+      itemSlotId: taskItems.slotId,
+      itemStatus: taskItems.status,
+      resultUrl: taskItems.resultUrl,
+    })
+    .from(taskSlots)
+    .innerJoin(taskItems, eq(taskItems.slotId, taskSlots.id))
+    .where(
+      and(
+        eq(taskSlots.taskId, taskId),
+        inArray(taskSlots.status, ["pending", "submitted"]),
+        eq(taskItems.status, "SUCCESS"),
+        isNotNull(taskItems.resultUrl),
+      ),
+    );
+
+  const seenSlotIds = new Set<string>();
+  let reconciled = 0;
+  const completedAt = new Date();
+
+  for (const row of rows) {
+    if (seenSlotIds.has(row.slotId)) continue;
+    const patch = resolveSubmittedSlotSuccessReconciliation(
+      { id: row.slotId, status: row.slotStatus },
+      {
+        id: row.itemId,
+        slotId: row.itemSlotId,
+        status: row.itemStatus,
+        resultUrl: row.resultUrl,
+      },
+    );
+    if (!patch) continue;
+
+    await db
+      .update(taskSlots)
+      .set({
+        status: patch.status,
+        resultUrl: patch.resultUrl,
+        winnerItemId: patch.winnerItemId,
+        completedAt,
+      })
+      .where(and(eq(taskSlots.id, row.slotId), inArray(taskSlots.status, ["pending", "submitted"])));
+
+    seenSlotIds.add(row.slotId);
+    reconciled += 1;
+  }
+
+  if (reconciled > 0) {
+    const successSlots = await db
+      .select({ id: taskSlots.id })
+      .from(taskSlots)
+      .where(and(eq(taskSlots.taskId, taskId), eq(taskSlots.status, "success")));
+
+    await db
+      .update(tasks)
+      .set({ successfulCount: successSlots.length })
+      .where(eq(tasks.id, taskId));
+  }
+
+  return reconciled;
 }
 
 // ─── Submit attempt ────────────────────────────────────────────────────────
@@ -125,10 +214,25 @@ export async function submitSlotAttempt(params: {
   await db
     .update(taskSlots)
     .set({
-      status: "submitted",
+      status: isImmediateSuccess ? "success" : "submitted",
       attemptCount: newAttemptNo,
+      winnerItemId: isImmediateSuccess ? item.id : null,
+      resultUrl: isImmediateSuccess ? immediate!.url : null,
+      completedAt: isImmediateSuccess ? new Date() : null,
     })
     .where(eq(taskSlots.id, slot.id));
+
+  if (isImmediateSuccess) {
+    const successSlots = await db
+      .select({ id: taskSlots.id })
+      .from(taskSlots)
+      .where(and(eq(taskSlots.taskId, task.id), eq(taskSlots.status, "success")));
+
+    await db
+      .update(tasks)
+      .set({ successfulCount: successSlots.length })
+      .where(eq(tasks.id, task.id));
+  }
 
   return { providerTaskId, itemId: item.id };
 }
@@ -277,6 +381,8 @@ export async function advanceSlotOnResult(params: {
 }
 
 export async function refillPendingSlotsIfCapacityAvailable(taskId: string): Promise<void> {
+  await reconcileSuccessfulSlotItems(taskId);
+
   const [task] = await db
     .select({
       id: tasks.id,
@@ -346,6 +452,8 @@ export async function maybeFinalizeFulfillmentTask(
     | "taskGroupId"
   >,
 ): Promise<boolean> {
+  await reconcileSuccessfulSlotItems(task.id);
+
   const allSlots = await db
     .select()
     .from(taskSlots)
@@ -380,6 +488,7 @@ export async function maybeFinalizeFulfillmentTask(
       : null
     : "视频生成失败，积分已自动退还";
 
+  let finalized = false;
   await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(tasks)
@@ -388,6 +497,7 @@ export async function maybeFinalizeFulfillmentTask(
         resultUrls: successUrls,
         resultAssetKeys: [],
         creditsCost: finalCreditsCost,
+        successfulCount: successCount,
         completedAt: new Date(),
         errorMessage,
       })
@@ -400,6 +510,7 @@ export async function maybeFinalizeFulfillmentTask(
       .returning({ id: tasks.id });
 
     if (!updated) return;
+    finalized = true;
 
     if (refundAmount > 0) {
       const [creditedUser] = await tx
@@ -420,6 +531,8 @@ export async function maybeFinalizeFulfillmentTask(
       });
     }
   });
+
+  if (!finalized) return false;
 
   if (task.taskGroupId) {
     await recomputeTaskGroupSummary(task.taskGroupId);
@@ -516,10 +629,15 @@ export async function submitPendingSlots(
   task: Pick<Task, "id" | "userId" | "modelId" | "soraPrompt" | "paramsJson">,
   options?: { limit?: number },
 ): Promise<string[]> {
+  await reconcileSuccessfulSlotItems(task.id);
+
+  const requestedLimit = options?.limit ?? getMaxBatchSlotSubmissionsPerTick();
+  if (requestedLimit <= 0) return [];
+
   const limit = Math.max(
     1,
     Math.min(
-      options?.limit ?? getMaxBatchSlotSubmissionsPerTick(),
+      requestedLimit,
       getMaxBatchSlotSubmissionsPerTick(),
     ),
   );
@@ -555,6 +673,8 @@ export async function getFulfillmentProgress(
   taskId: string,
   requestedCount: number,
 ): Promise<FulfillmentProgress> {
+  await reconcileSuccessfulSlotItems(taskId);
+
   const slots = await db
     .select()
     .from(taskSlots)
